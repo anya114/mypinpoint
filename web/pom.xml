@@ -1,5 +1,6 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.navercorp.pinpoint</groupId>
@@ -180,7 +181,7 @@
             <artifactId>ehcache-core</artifactId>
         </dependency>
 
-        <!--jackson jsonMapper. hbase need it for now. used 1.9.x version  -->
+        <!--jackson jsonMapper. hbase need it for now. used 1.9.x version -->
         <dependency>
             <groupId>org.codehaus.jackson</groupId>
             <artifactId>jackson-core-asl</artifactId>
@@ -287,7 +288,7 @@
             <groupId>org.aspectj</groupId>
             <artifactId>aspectjweaver</artifactId>
         </dependency>
-        
+
         <dependency>
             <groupId>org.springframework.batch</groupId>
             <artifactId>spring-batch-core</artifactId>
@@ -299,21 +300,21 @@
             <version>${spring-batch-version}</version>
             <scope>test</scope>
         </dependency>
-        
+
         <!-- for zookeeper test -->
         <dependency>
             <groupId>org.apache.curator</groupId>
             <artifactId>curator-test</artifactId>
             <scope>test</scope>
         </dependency>
-        
+
         <dependency>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>
             <version>3.0.1</version>
             <scope>test</scope>
-    </dependency>
-        
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -334,6 +335,17 @@
                     </webResources>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-maven-plugin</artifactId>
+                <version>9.2.6.v20141205</version>
+                <configuration>
+                    <httpConnector>
+                        <port>9090</port>
+                    </httpConnector>
+                    <scanIntervalSeconds>10</scanIntervalSeconds>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
     <profiles>
@@ -351,6 +363,9 @@
                             <port>20330</port>
                             <fork>true</fork>
                             <uriEncoding>UTF-8</uriEncoding>
+                            <warSourceDirectory>
+                                ${project.build.directory}/${project.build.finalName}
+                            </warSourceDirectory>
                         </configuration>
                         <executions>
                             <execution>

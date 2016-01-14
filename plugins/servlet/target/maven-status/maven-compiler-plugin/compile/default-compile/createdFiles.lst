@@ -1,0 +1,3 @@
+com/navercorp/pinpoint/plugin/servlet/ServletTypeProvider.class
+com/navercorp/pinpoint/plugin/servlet/ServletPlugin.class
+com/navercorp/pinpoint/plugin/servlet/ServletConstants.class

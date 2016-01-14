@@ -26,18 +26,20 @@
     <bean id="agentService" class="com.navercorp.pinpoint.web.service.AgentServiceImpl">
     </bean>
 
-    <bean id="activeThreadHandler" class="com.navercorp.pinpoint.web.websocket.ActiveThreadCountHandler">
+    <bean id="activeThreadHandler"
+          class="com.navercorp.pinpoint.web.websocket.ActiveThreadCountHandler">
         <!-- default value.
         <constructor-arg value="/agent/activeThread" />
         -->
-        <constructor-arg ref="agentService" />
+        <constructor-arg ref="agentService"/>
     </bean>
 
 
-    <bean id="handlerRegister" class="com.navercorp.pinpoint.web.websocket.PinpointWebSocketHandlerManager">
+    <bean id="handlerRegister"
+          class="com.navercorp.pinpoint.web.websocket.PinpointWebSocketHandlerManager">
         <constructor-arg>
             <list>
-                <ref bean="activeThreadHandler" />
+                <ref bean="activeThreadHandler"/>
             </list>
         </constructor-arg>
     </bean>

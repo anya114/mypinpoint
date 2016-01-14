@@ -26,47 +26,46 @@ import java.util.ServiceLoader;
 
 /**
  * TODO Loading all plugins with a single class loader could cause class collisions.
- *      Also, with current implementation, plugins can use dependencies by putting them in the plugin directory too.
- *      But it can lead to dependency collision between plugins because they are loaded by a single class loader.
- *      
- *      How can we prevent this?
- *      A ClassLoader per plugin could do it but then we have to create "N of target class loader" x "N of plugin" class loaders.
- *      It seems too much. For now, Just leave it as it is. 
- * 
- * 
- * @author Jongho Moon <jongho.moon@navercorp.com>
- * @author emeroad
+ * Also, with current implementation, plugins can use dependencies by putting them in the plugin directory too.
+ * But it can lead to dependency collision between plugins because they are loaded by a single class loader.
+ * <p/>
+ * How can we prevent this?
+ * A ClassLoader per plugin could do it but then we have to create "N of target class loader" x "N of plugin" class loaders.
+ * It seems too much. For now, Just leave it as it is.
  *
  * @param <T>
+ * @author Jongho Moon <jongho.moon@navercorp.com>
+ * @author emeroad
  */
 public class PluginLoader {
-    private static final SecurityManager SECURITY_MANAGER = System.getSecurityManager();
+  private static final SecurityManager SECURITY_MANAGER = System.getSecurityManager();
 
-    public static <T> List<T> load(Class<T> serviceType, URL[] urls) {
-        URLClassLoader classLoader = createPluginClassLoader(urls, ClassLoader.getSystemClassLoader());
-        return load(serviceType, classLoader);
-    }
+  public static <T> List<T> load(Class<T> serviceType, URL[] urls) {
+    URLClassLoader classLoader = createPluginClassLoader(urls, ClassLoader.getSystemClassLoader());
+    return load(serviceType, classLoader);
+  }
 
-    private static PluginLoaderClassLoader createPluginClassLoader(final URL[] urls, final ClassLoader parent) {
-        if (SECURITY_MANAGER != null) {
-            return AccessController.doPrivileged(new PrivilegedAction<PluginLoaderClassLoader>() {
-                public PluginLoaderClassLoader run() {
-                    return new PluginLoaderClassLoader(urls, parent);
-                }
-            });
-        } else {
-            return new PluginLoaderClassLoader(urls, parent);
+  private static PluginLoaderClassLoader createPluginClassLoader(final URL[] urls,
+      final ClassLoader parent) {
+    if (SECURITY_MANAGER != null) {
+      return AccessController.doPrivileged(new PrivilegedAction<PluginLoaderClassLoader>() {
+        public PluginLoaderClassLoader run() {
+          return new PluginLoaderClassLoader(urls, parent);
         }
+      });
+    } else {
+      return new PluginLoaderClassLoader(urls, parent);
     }
-    
-    public static <T> List<T> load(Class<T> serviceType, ClassLoader classLoader) {
-        ServiceLoader<T> serviceLoader = ServiceLoader.load(serviceType, classLoader);
-        
-        List<T> plugins = new ArrayList<T>();
-        for (T plugin : serviceLoader) {
-            plugins.add(serviceType.cast(plugin));
-        }
+  }
 
-        return plugins;
+  public static <T> List<T> load(Class<T> serviceType, ClassLoader classLoader) {
+    ServiceLoader<T> serviceLoader = ServiceLoader.load(serviceType, classLoader);
+
+    List<T> plugins = new ArrayList<T>();
+    for (T plugin : serviceLoader) {
+      plugins.add(serviceType.cast(plugin));
     }
+
+    return plugins;
+  }
 }

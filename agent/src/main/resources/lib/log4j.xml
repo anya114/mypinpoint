@@ -25,7 +25,7 @@
 
 
     <logger name="com.navercorp.pinpoint" additivity="false">
-        <level value="DEBUG" />
+        <level value="INFO" />
         <!-- for development mode -->
         <appender-ref ref="console" />
         <!-- for release mode -->
@@ -35,7 +35,7 @@
 
 
     <root>
-        <level value="DEBUG" />
+        <level value="INFO" />
         <!-- for development mode -->
         <appender-ref ref="console" />
         <!-- for release mode -->

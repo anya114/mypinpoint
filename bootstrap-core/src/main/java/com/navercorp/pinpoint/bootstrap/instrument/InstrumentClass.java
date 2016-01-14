@@ -16,10 +16,10 @@
 
 package com.navercorp.pinpoint.bootstrap.instrument;
 
-import java.util.List;
-
 import com.navercorp.pinpoint.bootstrap.interceptor.scope.ExecutionPolicy;
 import com.navercorp.pinpoint.bootstrap.interceptor.scope.InterceptorScope;
+
+import java.util.List;
 
 /**
  * @author emeroad
@@ -27,91 +27,110 @@ import com.navercorp.pinpoint.bootstrap.interceptor.scope.InterceptorScope;
  */
 public interface InstrumentClass {
 
-    boolean isInterface();
+  boolean isInterface();
 
-    String getName();
+  String getName();
 
-    String getSuperClass();
+  String getSuperClass();
 
-    String[] getInterfaces();
-    
-    InstrumentMethod getConstructor(String... parameterTypes);
+  String[] getInterfaces();
 
-    List<InstrumentMethod> getDeclaredMethods();
+  InstrumentMethod getConstructor(String... parameterTypes);
 
-    List<InstrumentMethod> getDeclaredMethods(MethodFilter filter);
+  List<InstrumentMethod> getDeclaredMethods();
 
-    InstrumentMethod getDeclaredMethod(String name, String... parameterTypes);
+  List<InstrumentMethod> getDeclaredMethods(MethodFilter filter);
 
-    List<InstrumentClass> getNestedClasses(ClassFilter filter);    
-    
-    ClassLoader getClassLoader();
+  InstrumentMethod getDeclaredMethod(String name, String... parameterTypes);
 
+  List<InstrumentClass> getNestedClasses(ClassFilter filter);
 
-    boolean isInterceptable();
-    
-    boolean hasConstructor(String... parameterTypes);
-
-    boolean hasDeclaredMethod(String methodName, String... parameterTypes);
-    
-    boolean hasMethod(String methodName, String... parameterTypes);
-    
-    boolean hasEnclosingMethod(String methodName, String... parameterTypes);
-    
-    boolean hasField(String name, String type);
-    
-    boolean hasField(String name);
-
-    
-    void weave(String adviceClassName) throws InstrumentException;
-
-    void addField(String accessorTypeName) throws InstrumentException;
-
-    void addGetter(String getterTypeName, String fieldName) throws InstrumentException;
+  ClassLoader getClassLoader();
 
 
-    int addInterceptor(String interceptorClassName) throws InstrumentException;
+  boolean isInterceptable();
 
-    int addInterceptor(String interceptorClassName, Object[] constructorArgs) throws InstrumentException;
+  boolean hasConstructor(String... parameterTypes);
 
-    int addInterceptor(MethodFilter filter, String interceptorClassName) throws InstrumentException;
+  boolean hasDeclaredMethod(String methodName, String... parameterTypes);
 
-    int addInterceptor(MethodFilter filter, String interceptorClassName, Object[] constructorArgs) throws InstrumentException;
+  boolean hasMethod(String methodName, String... parameterTypes);
 
+  boolean hasEnclosingMethod(String methodName, String... parameterTypes);
 
-    int addScopedInterceptor(String interceptorClassName, Object[] constructorArgs, String scopeName) throws InstrumentException;
+  boolean hasField(String name, String type);
 
-    int addScopedInterceptor(String interceptorClassName, Object[] constructorArgs, InterceptorScope scope) throws InstrumentException;
-
-
-    int addScopedInterceptor(String interceptorClassName, Object[] constructorArgs, String scopeName, ExecutionPolicy executionPolicy) throws InstrumentException;
-
-    int addScopedInterceptor(String interceptorClassName, Object[] constructorArgs, InterceptorScope scope, ExecutionPolicy executionPolicy) throws InstrumentException;
+  boolean hasField(String name);
 
 
-    int addScopedInterceptor(String interceptorClassName, String scopeName) throws InstrumentException;
+  void weave(String adviceClassName) throws InstrumentException;
 
-    int addScopedInterceptor(String interceptorClassName, InterceptorScope scope) throws InstrumentException;
+  void addField(String accessorTypeName) throws InstrumentException;
 
-
-    int addScopedInterceptor(String interceptorClassName, String scopeName, ExecutionPolicy executionPolicy) throws InstrumentException;
-
-    int addScopedInterceptor(String interceptorClassName, InterceptorScope scope, ExecutionPolicy executionPolicy) throws InstrumentException;
+  void addGetter(String getterTypeName, String fieldName) throws InstrumentException;
 
 
-    int addScopedInterceptor(MethodFilter filter, String interceptorClassName, String scopeName, ExecutionPolicy executionPolicy) throws InstrumentException;
+  int addInterceptor(String interceptorClassName) throws InstrumentException;
 
-    int addScopedInterceptor(MethodFilter filter, String interceptorClassName, InterceptorScope scope, ExecutionPolicy executionPolicy) throws InstrumentException;
+  int addInterceptor(String interceptorClassName, Object[] constructorArgs)
+      throws InstrumentException;
 
-    int addScopedInterceptor(MethodFilter filter, String interceptorClassName, Object[] constructorArgs, String scopeName, ExecutionPolicy executionPolicy) throws InstrumentException;
+  int addInterceptor(MethodFilter filter, String interceptorClassName) throws InstrumentException;
 
-    int addScopedInterceptor(MethodFilter filter, String interceptorClassName, Object[] constructorArgs, InterceptorScope scope, ExecutionPolicy executionPolicy) throws InstrumentException;
+  int addInterceptor(MethodFilter filter, String interceptorClassName, Object[] constructorArgs)
+      throws InstrumentException;
 
-    /**
-     * You should check that class already have Declared method.
-     * If class already have method, this method throw exception. 
-     */
-    InstrumentMethod addDelegatorMethod(String methodName, String... paramTypes) throws InstrumentException;
-    
-    byte[] toBytecode() throws InstrumentException;
+
+  int addScopedInterceptor(String interceptorClassName, Object[] constructorArgs, String scopeName)
+      throws InstrumentException;
+
+  int addScopedInterceptor(String interceptorClassName, Object[] constructorArgs,
+      InterceptorScope scope) throws InstrumentException;
+
+
+  int addScopedInterceptor(String interceptorClassName, Object[] constructorArgs, String scopeName,
+      ExecutionPolicy executionPolicy) throws InstrumentException;
+
+  int addScopedInterceptor(String interceptorClassName, Object[] constructorArgs,
+      InterceptorScope scope, ExecutionPolicy executionPolicy) throws InstrumentException;
+
+
+  int addScopedInterceptor(String interceptorClassName, String scopeName)
+      throws InstrumentException;
+
+  int addScopedInterceptor(String interceptorClassName, InterceptorScope scope)
+      throws InstrumentException;
+
+
+  int addScopedInterceptor(String interceptorClassName, String scopeName,
+      ExecutionPolicy executionPolicy) throws InstrumentException;
+
+  int addScopedInterceptor(String interceptorClassName, InterceptorScope scope,
+      ExecutionPolicy executionPolicy) throws InstrumentException;
+
+
+  int addScopedInterceptor(MethodFilter filter, String interceptorClassName, String scopeName,
+      ExecutionPolicy executionPolicy) throws InstrumentException;
+
+  int addScopedInterceptor(MethodFilter filter, String interceptorClassName, InterceptorScope scope,
+      ExecutionPolicy executionPolicy) throws InstrumentException;
+
+  int addScopedInterceptor(MethodFilter filter, String interceptorClassName,
+      Object[] constructorArgs, String scopeName, ExecutionPolicy executionPolicy)
+      throws InstrumentException;
+
+  int addScopedInterceptor(MethodFilter filter, String interceptorClassName,
+      Object[] constructorArgs, InterceptorScope scope, ExecutionPolicy executionPolicy)
+      throws InstrumentException;
+
+  /**
+   * You should check that class already have Declared method.
+   * If class already have method, this method throw exception.
+   */
+  InstrumentMethod addDelegatorMethod(String methodName, String... paramTypes)
+      throws InstrumentException;
+
+  byte[] toBytecode() throws InstrumentException;
+
+
 }

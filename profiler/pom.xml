@@ -1,5 +1,6 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.navercorp.pinpoint</groupId>
@@ -20,7 +21,7 @@
                     <groupId>org.apache.thrift</groupId>
                     <artifactId>libthrift</artifactId>
                 </exclusion>
-                 <exclusion>
+                <exclusion>
                     <groupId>org.slf4j</groupId>
                     <artifactId>slf4j-api</artifactId>
                 </exclusion>
@@ -40,6 +41,13 @@
                 </exclusion>
             </exclusions>
         </dependency>
+        <!-- new -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.16.6</version>
+        </dependency>
+        <!-- end new -->
         <dependency>
             <groupId>com.navercorp.pinpoint</groupId>
             <artifactId>pinpoint-bootstrap-core</artifactId>
@@ -52,7 +60,7 @@
             <groupId>com.navercorp.pinpoint</groupId>
             <artifactId>pinpoint-rpc</artifactId>
         </dependency>
-        
+
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
@@ -106,11 +114,11 @@
             <artifactId>mysql-connector-java</artifactId>
             <scope>provided</scope>
         </dependency>
-        <!--<dependency>-->
-            <!--<groupId>oracle</groupId>-->
-            <!--<artifactId>ojdbc6</artifactId>-->
-            <!--<scope>provided</scope>-->
-        <!--</dependency>-->
+        <!--<dependency> -->
+        <!--<groupId>oracle</groupId> -->
+        <!--<artifactId>ojdbc6</artifactId> -->
+        <!--<scope>provided</scope> -->
+        <!--</dependency> -->
         <dependency>
             <groupId>net.sourceforge.jtds</groupId>
             <artifactId>jtds</artifactId>
@@ -152,8 +160,9 @@
 
         <!-- [End] Compile Interceptors -->
 
-        <!-- 3.17.0 has been released. but upgrading may cause some problems because that has been compiled with jdk1.7
-            let's wait until release compiled with jdk1.6 -->
+        <!-- 3.17.0 has been released. but upgrading may cause some problems because
+            that has been compiled with jdk1.7 let's wait until release compiled with
+            jdk1.6 -->
         <dependency>
             <groupId>org.javassist</groupId>
             <artifactId>javassist</artifactId>
@@ -213,7 +222,7 @@
                 </exclusion>
             </exclusions>
         </dependency>
-        
+
         <dependency>
             <groupId>net.sf.ehcache</groupId>
             <artifactId>ehcache-core</artifactId>

@@ -27,37 +27,37 @@ import com.navercorp.pinpoint.bootstrap.plugin.ProfilerPlugin;
 import com.navercorp.pinpoint.bootstrap.plugin.ProfilerPluginSetupContext;
 
 /**
- * 
  * @author Jongho Moon
- *
  */
 public class JdkHttpPlugin implements ProfilerPlugin, TransformTemplateAware {
 
-    private TransformTemplate transformTemplate;
+  private TransformTemplate transformTemplate;
 
-    @Override
-    public void setup(ProfilerPluginSetupContext context) {
-        transformTemplate.transform("sun.net.www.protocol.http.HttpURLConnection", new TransformCallback() {
-            
-            @Override
-            public byte[] doInTransform(Instrumentor instrumentor, ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) throws InstrumentException {
-                InstrumentClass target = instrumentor.getInstrumentClass(loader, className, classfileBuffer);
-                
-                target.addGetter(ConnectedGetter.class.getName(), "connected");
+  @Override public void setup(ProfilerPluginSetupContext context) {
+    transformTemplate
+        .transform("sun.net.www.protocol.http.HttpURLConnection", new TransformCallback() {
 
-                if (target.hasField("connecting", "boolean")) {
-                    target.addGetter(ConnectingGetter.class.getName(), "connecting");
-                }
-                
-                target.addInterceptor("com.navercorp.pinpoint.plugin.jdk.http.interceptor.HttpURLConnectionInterceptor");
-                
-                return target.toBytecode();
+          @Override public byte[] doInTransform(Instrumentor instrumentor, ClassLoader loader,
+              String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
+              byte[] classfileBuffer) throws InstrumentException {
+            InstrumentClass target =
+                instrumentor.getInstrumentClass(loader, className, classfileBuffer);
+
+            target.addGetter(ConnectedGetter.class.getName(), "connected");
+
+            if (target.hasField("connecting", "boolean")) {
+              target.addGetter(ConnectingGetter.class.getName(), "connecting");
             }
-        });
-    }
 
-    @Override
-    public void setTransformTemplate(TransformTemplate transformTemplate) {
-        this.transformTemplate = transformTemplate;
-    }
+            target.addInterceptor(
+                "com.navercorp.pinpoint.plugin.jdk.http.interceptor.HttpURLConnectionInterceptor");
+
+            return target.toBytecode();
+          }
+        });
+  }
+
+  @Override public void setTransformTemplate(TransformTemplate transformTemplate) {
+    this.transformTemplate = transformTemplate;
+  }
 }

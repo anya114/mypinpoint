@@ -1,5 +1,6 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.navercorp.pinpoint</groupId>
@@ -67,36 +68,38 @@
                                 <phase>generate-sources</phase>
                                 <configuration>
                                     <target>
-                                        <mkdir dir="${basedir}/generated-sources/thrift" />
+                                        <mkdir dir="${basedir}/generated-sources/thrift"/>
                                         <delete>
-                                            <fileset dir="${basedir}/generated-sources/thrift" includes="**/*" />
+                                            <fileset dir="${basedir}/generated-sources/thrift"
+                                                     includes="**/*"/>
                                         </delete>
-                                        <mkdir dir="${basedir}/generated-sources/thrift" />
+                                        <mkdir dir="${basedir}/generated-sources/thrift"/>
                                         <exec executable="${thrift.executable}" failonerror="true">
-                                            <arg value="--gen" />
-                                            <arg value="java:beans" />
-                                            <arg value="-o" />
-                                            <arg value="${basedir}/generated-sources/thrift" />
-                                            <arg value="${basedir}/src/main/thrift/Pinpoint.thrift" />
+                                            <arg value="--gen"/>
+                                            <arg value="java:beans"/>
+                                            <arg value="-o"/>
+                                            <arg value="${basedir}/generated-sources/thrift"/>
+                                            <arg value="${basedir}/src/main/thrift/Pinpoint.thrift"/>
                                         </exec>
                                         <exec executable="${thrift.executable}" failonerror="true">
-                                            <arg value="--gen" />
-                                            <arg value="java:beans" />
-                                            <arg value="-o" />
-                                            <arg value="${basedir}/generated-sources/thrift" />
-                                            <arg value="${basedir}/src/main/thrift/Trace.thrift" />
+                                            <arg value="--gen"/>
+                                            <arg value="java:beans"/>
+                                            <arg value="-o"/>
+                                            <arg value="${basedir}/generated-sources/thrift"/>
+                                            <arg value="${basedir}/src/main/thrift/Trace.thrift"/>
                                         </exec>
                                         <exec executable="${thrift.executable}" failonerror="true">
-                                            <arg value="--gen" />
-                                            <arg value="java:beans" />
-                                            <arg value="-o" />
-                                            <arg value="${basedir}/generated-sources/thrift" />
-                                            <arg value="${basedir}/src/main/thrift/Command.thrift" />
+                                            <arg value="--gen"/>
+                                            <arg value="java:beans"/>
+                                            <arg value="-o"/>
+                                            <arg value="${basedir}/generated-sources/thrift"/>
+                                            <arg value="${basedir}/src/main/thrift/Command.thrift"/>
                                         </exec>
                                         <copy todir="src/main/java" overwrite="true">
-                                            <fileset dir="${basedir}/generated-sources/thrift/gen-javabean" />
+                                            <fileset
+                                                    dir="${basedir}/generated-sources/thrift/gen-javabean"/>
                                         </copy>
-                                        <delete dir="${basedir}/generated-sources" />
+                                        <delete dir="${basedir}/generated-sources"/>
                                     </target>
                                 </configuration>
                                 <goals>

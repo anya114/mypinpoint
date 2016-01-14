@@ -1,20 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
-       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:aop="http://www.springframework.org/schema/aop"
-       xmlns:context="http://www.springframework.org/schema/context"
-       xmlns:jee="http://www.springframework.org/schema/jee" xmlns:lang="http://www.springframework.org/schema/lang"
-       xmlns:beans="http://www.springframework.org/schema/beans" xmlns:p="http://www.springframework.org/schema/p"
-       xmlns:util="http://www.springframework.org/schema/util" xmlns:jdbc="http://www.springframework.org/schema/jdbc"
-       xmlns:hdp="http://www.springframework.org/schema/hadoop"
-       xsi:schemaLocation="http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc.xsd
-		http://www.springframework.org/schema/lang http://www.springframework.org/schema/lang/spring-lang.xsd
-		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd
-		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
-		http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd
-		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
-		http://www.springframework.org/schema/hadoop http://www.springframework.org/schema/hadoop/spring-hadoop.xsd">
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-    <bean id="hbaseConfiguration" class="org.springframework.data.hadoop.hbase.HbaseConfigurationFactoryBean">
+    <bean id="hbaseConfiguration"
+          class="org.springframework.data.hadoop.hbase.HbaseConfigurationFactoryBean">
         <property name="properties">
             <props>
                 <prop key="hbase.zookeeper.quorum">${hbase.client.host}</prop>
@@ -28,9 +18,13 @@
                 <prop key="hbase.client.operation.timeout">${hbase.client.operation.timeout}</prop>
 
                 <!-- hbase socket read timeout. default: 200000-->
-                <prop key="hbase.ipc.client.socket.timeout.read">${hbase.ipc.client.socket.timeout.read}</prop>
+                <prop key="hbase.ipc.client.socket.timeout.read">
+                    ${hbase.ipc.client.socket.timeout.read}
+                </prop>
                 <!-- socket write timeout. hbase default: 600000-->
-                <prop key="hbase.ipc.client.socket.timeout.write">${hbase.ipc.client.socket.timeout.write}</prop>
+                <prop key="hbase.ipc.client.socket.timeout.write">
+                    ${hbase.ipc.client.socket.timeout.write}
+                </prop>
             </props>
         </property>
         <property name="deleteConnection" value="false"/>
@@ -47,18 +41,21 @@
         <property name="configuration" ref="hbaseConfiguration"/>
         <property name="tableFactory" ref="connectionFactory"/>
     </bean>
-    
-    <bean id="hBaseAdminTemplate" class="com.navercorp.pinpoint.common.hbase.HBaseAdminTemplate" destroy-method="close">
+
+    <bean id="hBaseAdminTemplate" class="com.navercorp.pinpoint.common.hbase.HBaseAdminTemplate"
+          destroy-method="close">
         <constructor-arg ref="hbaseConfiguration" index="0"></constructor-arg>
     </bean>
 
     <bean class="org.apache.hadoop.util.ShutdownHookManagerProxy"/>
 
-    <bean id="applicationTraceIndexDistributor" class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix">
+    <bean id="applicationTraceIndexDistributor"
+          class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix">
         <constructor-arg ref="applicationTraceIndex"/>
     </bean>
 
-    <bean id="applicationTraceIndex" class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix$OneByteSimpleHash">
+    <bean id="applicationTraceIndex"
+          class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix$OneByteSimpleHash">
         <constructor-arg>
             <value type="int">32</value>
         </constructor-arg>
@@ -68,79 +65,94 @@
         <constructor-arg ref="traceHasher"/>
     </bean>
 
-    <bean id="traceHasher" class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix$OneByteSimpleHash">
+    <bean id="traceHasher"
+          class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix$OneByteSimpleHash">
         <constructor-arg>
             <value type="int">64</value>
         </constructor-arg>
     </bean>
 
 
-    <bean id="agentStatRowKeyDistributor" class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix">
+    <bean id="agentStatRowKeyDistributor"
+          class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix">
         <constructor-arg ref="agentStatRangeHasher"/>
     </bean>
 
-    <bean id="agentStatRangeHasher" class="com.navercorp.pinpoint.common.hbase.distributor.RangeOneByteSimpleHash">
+    <bean id="agentStatRangeHasher"
+          class="com.navercorp.pinpoint.common.hbase.distributor.RangeOneByteSimpleHash">
         <constructor-arg type="int" value="0"/>
         <constructor-arg type="int" value="24"/>
         <constructor-arg type="int" value="32"/>
     </bean>
 
-    <bean id="metadataRowKeyDistributor" class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix">
+    <bean id="metadataRowKeyDistributor"
+          class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix">
         <constructor-arg ref="metadataRangeHasher"/>
     </bean>
-    
-    <bean id="metadataRowKeyDistributor2" class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix">
+
+    <bean id="metadataRowKeyDistributor2"
+          class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix">
         <constructor-arg ref="metadataRangeHasher2"/>
     </bean>
 
-    <bean id="metadataRangeHasher" class="com.navercorp.pinpoint.common.hbase.distributor.RangeOneByteSimpleHash">
+    <bean id="metadataRangeHasher"
+          class="com.navercorp.pinpoint.common.hbase.distributor.RangeOneByteSimpleHash">
         <constructor-arg type="int" value="0"/>
         <constructor-arg type="int" value="32"/>
         <constructor-arg type="int" value="8"/>
     </bean>
-    
-    <bean id="metadataRangeHasher2" class="com.navercorp.pinpoint.common.hbase.distributor.RangeOneByteSimpleHash">
+
+    <bean id="metadataRangeHasher2"
+          class="com.navercorp.pinpoint.common.hbase.distributor.RangeOneByteSimpleHash">
         <constructor-arg type="int" value="0"/>
         <constructor-arg type="int" value="36"/>
         <constructor-arg type="int" value="32"/>
     </bean>
 
-    <bean id="acceptApplicationRowKeyDistributor" class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix">
+    <bean id="acceptApplicationRowKeyDistributor"
+          class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix">
         <constructor-arg ref="acceptApplicationHasher"/>
     </bean>
 
-    <bean id="acceptApplicationHasher" class="com.navercorp.pinpoint.common.hbase.distributor.RangeOneByteSimpleHash">
+    <bean id="acceptApplicationHasher"
+          class="com.navercorp.pinpoint.common.hbase.distributor.RangeOneByteSimpleHash">
         <!-- hash parentApplicationName -->
         <constructor-arg type="int" value="0"/>
         <constructor-arg type="int" value="24"/>
         <constructor-arg type="int" value="4"/>
     </bean>
 
-    <bean id="statisticsCalleeRowKeyDistributor" class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix">
+    <bean id="statisticsCalleeRowKeyDistributor"
+          class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix">
         <constructor-arg ref="statisticsCalleeHasher"/>
     </bean>
 
-    <bean id="statisticsCalleeHasher" class="com.navercorp.pinpoint.common.hbase.distributor.RangeOneByteSimpleHash">
+    <bean id="statisticsCalleeHasher"
+          class="com.navercorp.pinpoint.common.hbase.distributor.RangeOneByteSimpleHash">
         <constructor-arg type="int" value="0"/>
         <constructor-arg type="int" value="36"/>
         <constructor-arg type="int" value="32"/>
     </bean>
 
-    <bean id="statisticsCallerRowKeyDistributor" class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix">
+    <bean id="statisticsCallerRowKeyDistributor"
+          class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix">
         <constructor-arg ref="statisticsCallerHasher"/>
     </bean>
 
-    <bean id="statisticsCallerHasher" class="com.navercorp.pinpoint.common.hbase.distributor.RangeOneByteSimpleHash">
+    <bean id="statisticsCallerHasher"
+          class="com.navercorp.pinpoint.common.hbase.distributor.RangeOneByteSimpleHash">
         <constructor-arg type="int" value="0"/>
         <constructor-arg type="int" value="36"/>
         <constructor-arg type="int" value="32"/>
     </bean>
 
-    <bean id="statisticsSelfRowKeyDistributor" class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix">
+    <bean id="statisticsSelfRowKeyDistributor"
+          class="com.sematext.hbase.wd.RowKeyDistributorByHashPrefix">
         <constructor-arg ref="statisticsSelfHasher"/>
     </bean>
 
-    <bean id="statisticsSelfHasher" class="com.navercorp.pinpoint.common.hbase.distributor.RangeOneByteSimpleHash">
+    <bean id="statisticsSelfHasher"
+          class="com.navercorp.pinpoint.common.hbase.distributor.RangeOneByteSimpleHash">
         <constructor-arg type="int" value="0"/>
         <constructor-arg type="int" value="32"/>
         <constructor-arg type="int" value="8"/>

@@ -1,16 +1,14 @@
 /**
- * Copyright 2014 NAVER Corp.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Copyright 2014 NAVER Corp. Licensed under the Apache License, Version 2.0 (the "License"); you
+ * may not use this file except in compliance with the License. You may obtain a copy of the License
+ * at
  * 
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software distributed under the License
+ * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+ * or implied. See the License for the specific language governing permissions and limitations under
+ * the License.
  */
 package com.navercorp.pinpoint.profiler.plugin;
 
@@ -36,62 +34,74 @@ import com.navercorp.pinpoint.profiler.instrument.JarProfilerPluginClassInjector
  *
  */
 public class ProfilerPluginLoader {
-    private final Logger logger = LoggerFactory.getLogger(getClass());
-    private final DefaultAgent agent;
+  private final Logger logger = LoggerFactory.getLogger(getClass());
+  private final DefaultAgent agent;
+
+  public ProfilerPluginLoader(DefaultAgent agent) {
+    this.agent = agent;
+  }
+
+  public List<DefaultProfilerPluginContext> load(URL[] pluginJars) {
+    firstUserPlugin(pluginJars);
     
-    public ProfilerPluginLoader(DefaultAgent agent) {
-        this.agent = agent;
-    }
+    List<DefaultProfilerPluginContext> pluginContexts =
+        new ArrayList<DefaultProfilerPluginContext>(pluginJars.length);
+    List<String> disabled = agent.getProfilerConfig().getDisabledPlugins();
     
-    public List<DefaultProfilerPluginContext> load(URL[] pluginJars) {
-        List<DefaultProfilerPluginContext> pluginContexts = new ArrayList<DefaultProfilerPluginContext>(pluginJars.length);
-        List<String> disabled = agent.getProfilerConfig().getDisabledPlugins();
-        
-        for (URL jar : pluginJars) {
-            List<ProfilerPlugin> plugins = PluginLoader.load(ProfilerPlugin.class, new URL[] { jar });
-            
-            for (ProfilerPlugin plugin : plugins) {
-                if (disabled.contains(plugin.getClass().getName())) {
-                    logger.info("Skip disabled plugin: {}", plugin.getClass().getName());
-                    continue;
-                }
-                
-                logger.info("Loading plugin: {}", plugin.getClass().getName());
-
-                final DefaultProfilerPluginContext context = setupPlugin(jar, plugin);
-                pluginContexts.add(context);
-            }
+    for (URL jar : pluginJars) {
+      List<ProfilerPlugin> plugins = PluginLoader.load(ProfilerPlugin.class, new URL[] {jar});
+      for (ProfilerPlugin plugin : plugins) {
+        if (disabled.contains(plugin.getClass().getName())) {
+          logger.info("Skip disabled plugin: {}", plugin.getClass().getName());
+          continue;
         }
-        
-        
-        return pluginContexts;
+
+        logger.info("Loading plugin: {}", plugin.getClass().getName());
+
+        final DefaultProfilerPluginContext context = setupPlugin(jar, plugin);
+        pluginContexts.add(context);
+      }
     }
-
-    private GuardInstrumentContext preparePlugin(ProfilerPlugin plugin, InstrumentContext context) {
-        GuardInstrumentContext guardInstrumentContext = new GuardInstrumentContext(context);
-        if (plugin instanceof TransformTemplateAware) {
-            logger.info("setTransformTemplate");
-            final TransformTemplate transformTemplate = new TransformTemplate(guardInstrumentContext);
-            ((TransformTemplateAware) plugin).setTransformTemplate(transformTemplate);
-        }
-        return guardInstrumentContext;
+    return pluginContexts;
+  }
+  
+  private void firstUserPlugin(URL[] pluginJars) {
+    int userPluginIndex = 0;
+    for(int i = 0; i < pluginJars.length; i++) {
+      if(pluginJars[i].getPath().contains("user-plugin"))
+        userPluginIndex = i;
     }
+    URL tmp = pluginJars[0];
+    pluginJars[0] = pluginJars[userPluginIndex];
+    pluginJars[userPluginIndex] = tmp;
+  }
 
-    private DefaultProfilerPluginContext setupPlugin(URL jar, ProfilerPlugin plugin) {
-        final ClassInjector classInjector = JarProfilerPluginClassInjector.of(agent.getInstrumentation(), agent.getClassPool(), jar);
-        final DefaultProfilerPluginContext context = new DefaultProfilerPluginContext(agent, classInjector);
+  private DefaultProfilerPluginContext setupPlugin(URL jar, ProfilerPlugin plugin) {
+    final ClassInjector classInjector =
+        JarProfilerPluginClassInjector.of(agent.getInstrumentation(), agent.getClassPool(), jar);
+    final DefaultProfilerPluginContext context =
+        new DefaultProfilerPluginContext(agent, classInjector);
 
-        final GuardProfilerPluginContext guardPluginContext = new GuardProfilerPluginContext(context);
-        final GuardInstrumentContext guardInstrumentContext = preparePlugin(plugin, context);
-        try {
+    final GuardProfilerPluginContext guardPluginContext = new GuardProfilerPluginContext(context);
+    final GuardInstrumentContext guardInstrumentContext = preparePlugin(plugin, context);
+    try {
 
-            // WARN external plugin api
-            plugin.setup(guardPluginContext);
-        } finally {
-            guardPluginContext.close();
-            guardInstrumentContext.close();
-        }
-        return context;
+      // WARN external plugin api
+      plugin.setup(guardPluginContext);
+    } finally {
+      guardPluginContext.close();
+      guardInstrumentContext.close();
     }
+    return context;
+  }
 
+  private GuardInstrumentContext preparePlugin(ProfilerPlugin plugin, InstrumentContext context) {
+    GuardInstrumentContext guardInstrumentContext = new GuardInstrumentContext(context);
+    if (plugin instanceof TransformTemplateAware) {
+      logger.info("setTransformTemplate");
+      final TransformTemplate transformTemplate = new TransformTemplate(guardInstrumentContext);
+      ((TransformTemplateAware) plugin).setTransformTemplate(transformTemplate);
+    }
+    return guardInstrumentContext;
+  }
 }

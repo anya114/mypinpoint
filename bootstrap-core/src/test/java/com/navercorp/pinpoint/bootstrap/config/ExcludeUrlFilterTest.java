@@ -90,4 +90,10 @@ public class ExcludeUrlFilterTest {
         Assert.assertFalse(filter.filter("/monitor/stringEquals.test"));
         Assert.assertFalse(filter.filter("/monitor/antstyleXXX.html"));
     }
+
+    @Test
+    public void excludeJs() throws Exception {
+        Filter<String> filter = new ExcludeUrlFilter("/**/*.js");
+        Assert.assertTrue(filter.filter("/monitor/then/hello.js"));
+    }
 }

@@ -30,8 +30,7 @@ public class TestObject3 {
         this.intValue = value;
     }
 
-    @Override
-    public String toString() {
+    public String getValue() {
         return value;
     }
 }

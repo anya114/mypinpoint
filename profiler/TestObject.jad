@@ -1,0 +1,119 @@
+// Decompiled by Jad v1.5.8g. Copyright 2001 Pavel Kouznetsov.
+// Jad home page: http://www.kpdus.com/jad.html
+// Decompiler options: packimports(3)
+// Source File Name:   TestObject.java
+
+package com.navercorp.pinpoint.profiler.interceptor.bci;
+
+import com.navercorp.pinpoint.bootstrap.interceptor.*;
+import com.navercorp.pinpoint.bootstrap.interceptor.registry.InterceptorRegistry;
+import java.io.PrintStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+// Referenced classes of package com.navercorp.pinpoint.profiler.interceptor.bci:
+//            TestObject2
+
+public class TestObject extends TestObject2
+{
+
+public TestObject()
+{
+        logger = LoggerFactory.getLogger(getClass().getName());
+        isthrow = false;
+        returnCode = 1;
+}
+
+public void setIsthrow(boolean isthrow)
+{
+        this.isthrow = isthrow;
+}
+
+public void setReturnCode(int returnCode)
+{
+        this.returnCode = returnCode;
+}
+
+public int callA()
+{
+        logger.info("callA");
+        int i = callA++;
+        if(isthrow)
+                throw new RuntimeException("ddd");
+        System.out.println("callA");
+        if(returnCode == 1)
+                return 1;
+        return returnCode != 10 ? 0 : -1;
+}
+
+public static void before()
+{
+        System.out.println("BEFORE");
+}
+
+public static void after()
+{
+        System.out.println("AFTER");
+}
+
+public static void callCatch()
+{
+        System.out.println("callCatch");
+}
+
+public String hello(String a)
+{
+        System.out.println((new StringBuilder()).append("a:").append(a).toString());
+        System.out.println("test");
+        return "a";
+}
+
+public String toString()
+{
+        Interceptor _$PINPOINT$_interceptor0;
+        _$PINPOINT$_interceptor0 = null;
+        try
+        {
+                _$PINPOINT$_interceptor0 = InterceptorRegistry.getInterceptor(0);
+                ((StaticAroundInterceptor)_$PINPOINT$_interceptor0).before(this, "com.navercorp.pinpoint.profiler.interceptor.bci.TestObject", "toString", "()", null);
+        }
+        // Misplaced declaration of an exception variable
+        catch(Interceptor _$PINPOINT$_interceptor0)
+        {
+                InterceptorInvokerHelper.handleException(_$PINPOINT$_interceptor0);
+        }
+        goto _L1
+        throwable;
+        try
+        {
+                ((StaticAroundInterceptor)_$PINPOINT$_interceptor0).after(this, "com.navercorp.pinpoint.profiler.interceptor.bci.TestObject", "toString", "()", null, null, throwable);
+        }
+        catch(Throwable throwable1)
+        {
+                InterceptorInvokerHelper.handleException(throwable1);
+        }
+        throw throwable;
+_L1:
+        Throwable throwable;
+        String s = "TestObject";
+        try
+        {
+                ((StaticAroundInterceptor)_$PINPOINT$_interceptor0).after(this, "com.navercorp.pinpoint.profiler.interceptor.bci.TestObject", "toString", "()", null, s, null);
+        }
+        catch(Throwable throwable2)
+        {
+                InterceptorInvokerHelper.handleException(throwable2);
+        }
+    return s;
+}
+
+public void callB()
+{
+        super.callB();
+}
+
+private Logger logger;
+private int callA;
+private boolean isthrow;
+private int returnCode;
+}

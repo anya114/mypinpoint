@@ -9,7 +9,7 @@
         <artifactId>pom</artifactId>
         <version>1.5.1-SNAPSHOT</version>
     </parent>
-    
+
     <artifactId>pinpoint-rpc</artifactId>
     <name>pinpoint-rpc</name>
     <packaging>jar</packaging>

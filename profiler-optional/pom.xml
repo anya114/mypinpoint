@@ -1,20 +1,23 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.navercorp.pinpoint</groupId>
         <artifactId>pom</artifactId>
         <version>1.5.1-SNAPSHOT</version>
     </parent>
-    
+
     <artifactId>pinpoint-profiler-optional</artifactId>
+    <packaging>jar</packaging>
     <name>pinpoint-profiler-optional</name>
     <description>pinpoint profiler optional package</description>
-    
+
     <properties>
         <jdk.version>1.7</jdk.version>
         <jdk.home>${env.JAVA_7_HOME}</jdk.home>
     </properties>
-    
+
     <dependencies>
         <dependency>
             <groupId>com.navercorp.pinpoint</groupId>

@@ -1,17 +1,15 @@
 /*
  * Copyright 2014 NAVER Corp.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software distributed under the License
+ * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+ * or implied. See the License for the specific language governing permissions and limitations under
+ * the License.
  */
 
 package com.navercorp.pinpoint.profiler.plugin;
@@ -38,147 +36,161 @@ import com.navercorp.pinpoint.profiler.interceptor.scope.DefaultInterceptorScope
 import com.navercorp.pinpoint.profiler.util.JavaAssistUtils;
 import com.navercorp.pinpoint.profiler.util.NameValueList;
 
+import lombok.Getter;
+
 public class DefaultProfilerPluginContext implements ProfilerPluginSetupContext, InstrumentContext {
-    private final DefaultAgent agent;
-    private final ClassInjector classInjector;
-    
-    private final List<ApplicationTypeDetector> serverTypeDetectors = new ArrayList<ApplicationTypeDetector>();
-    private final List<ClassFileTransformer> classTransformers = new ArrayList<ClassFileTransformer>();
-    
-    private final NameValueList<InterceptorScope> interceptorScopeList = new NameValueList<InterceptorScope>();
-    
-    public DefaultProfilerPluginContext(DefaultAgent agent, ClassInjector classInjector) {
-        if (agent == null) {
-            throw new NullPointerException("agent must not be null");
-        }
-        if (classInjector == null) {
-            throw new NullPointerException("classInjector must not be null");
-        }
-        this.agent = agent;
-        this.classInjector = classInjector;
+  @Getter
+  private final DefaultAgent agent;
+  private final ClassInjector classInjector;
+
+  private final List<ApplicationTypeDetector> serverTypeDetectors =
+      new ArrayList<ApplicationTypeDetector>();
+  private final List<ClassFileTransformer> classTransformers =
+      new ArrayList<ClassFileTransformer>();
+
+  private final NameValueList<InterceptorScope> interceptorScopeList =
+      new NameValueList<InterceptorScope>();
+
+  public DefaultProfilerPluginContext(DefaultAgent agent, ClassInjector classInjector) {
+    if (agent == null) {
+      throw new NullPointerException("agent must not be null");
+    }
+    if (classInjector == null) {
+      throw new NullPointerException("classInjector must not be null");
+    }
+    this.agent = agent;
+    this.classInjector = classInjector;
+  }
+
+  @Override
+  public ProfilerConfig getConfig() {
+    return agent.getProfilerConfig();
+  }
+
+  @Override
+  public TraceContext getTraceContext() {
+    final TraceContext context = agent.getTraceContext();
+    if (context == null) {
+      throw new IllegalStateException("TraceContext is not created yet");
     }
 
-    @Override
-    public ProfilerConfig getConfig() {
-        return agent.getProfilerConfig();
+    return context;
+  }
+
+  @Override
+  public void addApplicationTypeDetector(ApplicationTypeDetector... detectors) {
+    if (detectors == null) {
+      return;
+    }
+    for (ApplicationTypeDetector detector : detectors) {
+      serverTypeDetectors.add(detector);
+    }
+  }
+
+  @Override
+  public InstrumentClass getInstrumentClass(ClassLoader classLoader, String javaClassName,
+      byte[] classFileBuffer) {
+    if (javaClassName == null) {
+      throw new NullPointerException("className must not be null");
+    }
+    try {
+      return agent.getClassPool().getClass(this, classLoader, javaClassName, classFileBuffer);
+    } catch (NotFoundInstrumentException e) {
+      return null;
+    }
+  }
+
+  @Override
+  public boolean exist(ClassLoader classLoader, String className) {
+    if (className == null) {
+      throw new NullPointerException("className must not be null");
     }
 
-    @Override
-    public TraceContext getTraceContext() {
-        final TraceContext context = agent.getTraceContext();
-        if (context == null) {
-            throw new IllegalStateException("TraceContext is not created yet");
-        }
-        
-        return context;
-    }
-        
-    @Override
-    public void addApplicationTypeDetector(ApplicationTypeDetector... detectors) {
-        if (detectors == null) {
-            return;
-        }
-        for (ApplicationTypeDetector detector : detectors) {
-            serverTypeDetectors.add(detector);
-        }
-    }
-    
-    @Override
-    public InstrumentClass getInstrumentClass(ClassLoader classLoader, String className, byte[] classFileBuffer) {
-        if (className == null) {
-            throw new NullPointerException("className must not be null");
-        }
-        try {
-            return agent.getClassPool().getClass(this, classLoader, className, classFileBuffer);
-        } catch (NotFoundInstrumentException e) {
-            return null;
-        }
-    }
-    
-    @Override
-    public boolean exist(ClassLoader classLoader, String className) {
-        if (className == null) {
-            throw new NullPointerException("className must not be null");
-        }
+    return agent.getClassPool().hasClass(classLoader, className);
+  }
 
-        return agent.getClassPool().hasClass(classLoader, className);
+  @Override
+  public void addClassFileTransformer(final String targetClassName,
+      final TransformCallback transformCallback) {
+    if (targetClassName == null) {
+      throw new NullPointerException("targetClassName must not be null");
+    }
+    if (transformCallback == null) {
+      throw new NullPointerException("transformCallback must not be null");
     }
 
-    @Override
-    public void addClassFileTransformer(final String targetClassName, final TransformCallback transformCallback) {
-        if (targetClassName == null) {
-            throw new NullPointerException("targetClassName must not be null");
-        }
-        if (transformCallback == null) {
-            throw new NullPointerException("transformCallback must not be null");
-        }
+    final Matcher matcher =
+        Matchers.newClassNameMatcher(JavaAssistUtils.javaNameToJvmName(targetClassName));
+    final MatchableClassFileTransformerGuardDelegate guard =
+        new MatchableClassFileTransformerGuardDelegate(this, matcher, transformCallback);
+    classTransformers.add(guard);
+  }
 
-        final Matcher matcher = Matchers.newClassNameMatcher(JavaAssistUtils.javaNameToJvmName(targetClassName));
-        final MatchableClassFileTransformerGuardDelegate guard = new MatchableClassFileTransformerGuardDelegate(this, matcher, transformCallback);
-        classTransformers.add(guard);
+  @Override
+  public void addClassFileTransformer(ClassLoader classLoader, String targetClassName,
+      final TransformCallback transformCallback) {
+    if (targetClassName == null) {
+      throw new NullPointerException("targetClassName must not be null");
     }
-    
-    @Override
-    public void addClassFileTransformer(ClassLoader classLoader, String targetClassName, final TransformCallback transformCallback) {
-        if (targetClassName == null) {
-            throw new NullPointerException("targetClassName must not be null");
-        }
-        if (transformCallback == null) {
-            throw new NullPointerException("transformCallback must not be null");
-        }
-
-        final ClassFileTransformerGuardDelegate classFileTransformerGuardDelegate = new ClassFileTransformerGuardDelegate(this, transformCallback);
-
-        final DynamicTransformService dynamicTransformService = agent.getDynamicTransformService();
-        dynamicTransformService.addClassFileTransformer(classLoader, targetClassName, classFileTransformerGuardDelegate);
+    if (transformCallback == null) {
+      throw new NullPointerException("transformCallback must not be null");
     }
 
+    final ClassFileTransformerGuardDelegate classFileTransformerGuardDelegate =
+        new ClassFileTransformerGuardDelegate(this, transformCallback);
 
-    @Override
-    public void retransform(Class<?> target, final TransformCallback transformCallback) {
-        if (target == null) {
-            throw new NullPointerException("target must not be null");
-        }
-        if (transformCallback == null) {
-            throw new NullPointerException("transformCallback must not be null");
-        }
+    final DynamicTransformService dynamicTransformService = agent.getDynamicTransformService();
+    dynamicTransformService.addClassFileTransformer(classLoader, targetClassName,
+        classFileTransformerGuardDelegate);
+  }
 
-        final ClassFileTransformerGuardDelegate classFileTransformerGuardDelegate = new ClassFileTransformerGuardDelegate(this, transformCallback);
 
-        final DynamicTransformService dynamicTransformService = agent.getDynamicTransformService();
-        dynamicTransformService.retransform(target, classFileTransformerGuardDelegate);
+  @Override
+  public void retransform(Class<?> target, final TransformCallback transformCallback) {
+    if (target == null) {
+      throw new NullPointerException("target must not be null");
+    }
+    if (transformCallback == null) {
+      throw new NullPointerException("transformCallback must not be null");
     }
 
+    final ClassFileTransformerGuardDelegate classFileTransformerGuardDelegate =
+        new ClassFileTransformerGuardDelegate(this, transformCallback);
 
-    @Override
-    public <T> Class<? extends T> injectClass(ClassLoader targetClassLoader, String className) {
-        if (className == null) {
-            throw new NullPointerException("className must not be null");
-        }
+    final DynamicTransformService dynamicTransformService = agent.getDynamicTransformService();
+    dynamicTransformService.retransform(target, classFileTransformerGuardDelegate);
+  }
 
-        return classInjector.injectClass(targetClassLoader, className);
+
+  @Override
+  public <T> Class<? extends T> injectClass(ClassLoader targetClassLoader, String className) {
+    if (className == null) {
+      throw new NullPointerException("className must not be null");
     }
 
-    public List<ClassFileTransformer> getClassEditors() {
-        return classTransformers;
+    return classInjector.injectClass(targetClassLoader, className);
+  }
+
+  public List<ClassFileTransformer> getClassEditors() {
+    return classTransformers;
+  }
+
+  public List<ApplicationTypeDetector> getApplicationTypeDetectors() {
+    return serverTypeDetectors;
+  }
+
+  @Override
+  public InterceptorScope getInterceptorScope(String name) {
+    if (name == null) {
+      throw new NullPointerException("name must not be null");
+    }
+    InterceptorScope scope = interceptorScopeList.get(name);
+
+    if (scope == null) {
+      scope = new DefaultInterceptorScope(name);
+      interceptorScopeList.add(name, scope);
     }
 
-    public List<ApplicationTypeDetector> getApplicationTypeDetectors() {
-        return serverTypeDetectors;
-    }
-
-    @Override
-    public InterceptorScope getInterceptorScope(String name) {
-        if (name == null) {
-            throw new NullPointerException("name must not be null");
-        }
-        InterceptorScope scope = interceptorScopeList.get(name);
-        
-        if (scope == null) {
-            scope = new DefaultInterceptorScope(name);
-            interceptorScopeList.add(name, scope);
-        }
-        
-        return scope;
-    }
+    return scope;
+  }
 }

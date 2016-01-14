@@ -1,17 +1,15 @@
 /*
  * Copyright 2014 NAVER Corp.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software distributed under the License
+ * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+ * or implied. See the License for the specific language governing permissions and limitations under
+ * the License.
  */
 
 package com.navercorp.pinpoint.profiler;
@@ -77,352 +75,376 @@ import com.navercorp.pinpoint.rpc.client.PinpointClientFactory;
  */
 public class DefaultAgent implements Agent {
 
-    private final Logger logger = LoggerFactory.getLogger(this.getClass());
+  private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    private final PLoggerBinder binder;
+  private final PLoggerBinder binder;
 
-    private final ClassFileTransformerDispatcher classFileTransformer;
-    
-    private final ProfilerConfig profilerConfig;
+  private final ClassFileTransformerDispatcher classFileTransformer;
 
-    private final AgentInfoSender agentInfoSender;
-    private final AgentStatMonitor agentStatMonitor;
+  private final ProfilerConfig profilerConfig;
 
-    private final TraceContext traceContext;
+  private final AgentInfoSender agentInfoSender;
+  private final AgentStatMonitor agentStatMonitor;
 
-    private PinpointClientFactory clientFactory;
-    private PinpointClient client;
-    private final EnhancedDataSender tcpDataSender;
+  private final TraceContext traceContext;
 
-    private final DataSender statDataSender;
-    private final DataSender spanDataSender;
+  private PinpointClientFactory clientFactory;
+  private PinpointClient client;
+  private final EnhancedDataSender tcpDataSender;
 
-    private final AgentInformation agentInformation;
-    private final ServerMetaDataHolder serverMetaDataHolder;
+  private final DataSender statDataSender;
+  private final DataSender spanDataSender;
 
-    private volatile AgentStatus agentStatus;
+  private final AgentInformation agentInformation;
+  private final ServerMetaDataHolder serverMetaDataHolder;
 
-    private final InterceptorRegistryBinder interceptorRegistryBinder;
-    private final ServiceTypeRegistryService serviceTypeRegistryService;
-    
-    private final Instrumentation instrumentation;
-    private final JavassistClassPool classPool;
-    private final DynamicTransformService dynamicTransformService;
-    private final List<DefaultProfilerPluginContext> pluginContexts;
-    
+  private volatile AgentStatus agentStatus;
 
-    static {
-        // Preload classes related to pinpoint-rpc module.
-        ClassPreLoader.preload();
+  private final InterceptorRegistryBinder interceptorRegistryBinder;
+  private final ServiceTypeRegistryService serviceTypeRegistryService;
+
+  private final Instrumentation instrumentation;
+  private final JavassistClassPool classPool;
+  private final DynamicTransformService dynamicTransformService;
+  private final List<DefaultProfilerPluginContext> pluginContexts;
+
+
+  static {
+    // Preload classes related to pinpoint-rpc module.
+    ClassPreLoader.preload();
+  }
+
+  public DefaultAgent(AgentOption agentOption) {
+    this(agentOption, new DefaultInterceptorRegistryBinder());
+  }
+
+  public DefaultAgent(AgentOption agentOption,
+      final InterceptorRegistryBinder interceptorRegistryBinder) {
+    if (agentOption == null) {
+      throw new NullPointerException("agentOption must not be null");
     }
-    public DefaultAgent(AgentOption agentOption) {
-        this(agentOption, new DefaultInterceptorRegistryBinder());
+    if (agentOption.getInstrumentation() == null) {
+      throw new NullPointerException("instrumentation must not be null");
     }
-
-    public DefaultAgent(AgentOption agentOption, final InterceptorRegistryBinder interceptorRegistryBinder) {
-        if (agentOption == null) {
-            throw new NullPointerException("agentOption must not be null");
-        }
-        if (agentOption.getInstrumentation() == null) {
-            throw new NullPointerException("instrumentation must not be null");
-        }
-        if (agentOption.getProfilerConfig() == null) {
-            throw new NullPointerException("profilerConfig must not be null");
-        }
-        if (agentOption.getServiceTypeRegistryService() == null) {
-            throw new NullPointerException("serviceTypeRegistryService must not be null");
-        }
-
-        if (interceptorRegistryBinder == null) {
-            throw new NullPointerException("interceptorRegistryBinder must not be null");
-        }
-
-        this.binder = new Slf4jLoggerBinder();
-        bindPLoggerFactory(this.binder);
-
-        this.interceptorRegistryBinder = interceptorRegistryBinder;
-        interceptorRegistryBinder.bind();
-        this.serviceTypeRegistryService = agentOption.getServiceTypeRegistryService();
-
-        dumpSystemProperties();
-        dumpConfig(agentOption.getProfilerConfig());
-
-        changeStatus(AgentStatus.INITIALIZING);
-        
-        this.profilerConfig = agentOption.getProfilerConfig();
-        this.instrumentation = agentOption.getInstrumentation();
-        this.classPool = new JavassistClassPool(interceptorRegistryBinder, agentOption.getBootStrapJarPath());
-        
-        if (logger.isInfoEnabled()) {
-            logger.info("DefaultAgent classLoader:{}", this.getClass().getClassLoader());
-        }
-
-        pluginContexts = loadPlugins(agentOption);
-
-        this.classFileTransformer = new ClassFileTransformerDispatcher(this, pluginContexts);
-        this.dynamicTransformService = new DynamicTransformService(instrumentation, classFileTransformer);
-
-        instrumentation.addTransformer(this.classFileTransformer, true);
-
-        String applicationServerTypeString = profilerConfig.getApplicationServerType();
-        ServiceType applicationServerType = this.serviceTypeRegistryService.findServiceTypeByName(applicationServerTypeString);
-
-        final ApplicationServerTypeResolver typeResolver = new ApplicationServerTypeResolver(pluginContexts, applicationServerType, profilerConfig.getApplicationTypeDetectOrder());
-        
-        final AgentInformationFactory agentInformationFactory = new AgentInformationFactory();
-        this.agentInformation = agentInformationFactory.createAgentInformation(typeResolver.resolve());
-        logger.info("agentInformation:{}", agentInformation);
-        
-        CommandDispatcher commandDispatcher = new CommandDispatcher();
-
-        this.tcpDataSender = createTcpDataSender(commandDispatcher);
-
-        this.serverMetaDataHolder = createServerMetaDataHolder();
-
-        this.spanDataSender = createUdpSpanDataSender(this.profilerConfig.getCollectorSpanServerPort(), "Pinpoint-UdpSpanDataExecutor",
-                this.profilerConfig.getSpanDataSenderWriteQueueSize(), this.profilerConfig.getSpanDataSenderSocketTimeout(),
-                this.profilerConfig.getSpanDataSenderSocketSendBufferSize());
-        this.statDataSender = createUdpStatDataSender(this.profilerConfig.getCollectorStatServerPort(), "Pinpoint-UdpStatDataExecutor",
-                this.profilerConfig.getStatDataSenderWriteQueueSize(), this.profilerConfig.getStatDataSenderSocketTimeout(),
-                this.profilerConfig.getStatDataSenderSocketSendBufferSize());
-
-        this.traceContext = createTraceContext();
-
-        addCommandService(commandDispatcher, traceContext);
-
-        this.agentInfoSender = new AgentInfoSender.Builder(tcpDataSender, this.agentInformation).sendInterval(profilerConfig.getAgentInfoSendRetryInterval()).build();
-        this.serverMetaDataHolder.addListener(this.agentInfoSender);
-
-        AgentStatCollectorFactory agentStatCollectorFactory = new AgentStatCollectorFactory(this.getTransactionCounter(this.traceContext));
-        this.agentStatMonitor = new AgentStatMonitor(this.statDataSender, this.agentInformation.getAgentId(), this.agentInformation.getStartTime(), agentStatCollectorFactory);
-        
-        InterceptorInvokerHelper.setPropagateException(profilerConfig.isPropagateInterceptorException());
+    if (agentOption.getProfilerConfig() == null) {
+      throw new NullPointerException("profilerConfig must not be null");
+    }
+    if (agentOption.getServiceTypeRegistryService() == null) {
+      throw new NullPointerException("serviceTypeRegistryService must not be null");
     }
 
-    protected List<DefaultProfilerPluginContext> loadPlugins(AgentOption agentOption) {
-        return new ProfilerPluginLoader(this).load(agentOption.getPluginJars());
+    if (interceptorRegistryBinder == null) {
+      throw new NullPointerException("interceptorRegistryBinder must not be null");
     }
 
-    private void addCommandService(CommandDispatcher commandDispatcher, TraceContext traceContext) {
-        commandDispatcher.registerCommandService(new ThreadDumpService());
-        commandDispatcher.registerCommandService(new EchoService());
+    this.binder = new Slf4jLoggerBinder();
+    bindPLoggerFactory(this.binder);
 
-        if (traceContext instanceof DefaultTraceContext) {
-            ActiveTraceLocator activeTraceLocator = ((DefaultTraceContext) traceContext).getActiveTraceLocator();
-            if (activeTraceLocator != null) {
-                commandDispatcher.registerCommandService(new ActiveThreadService(activeTraceLocator));
-            }
-        }
-    }
-    
-    private TransactionCounter getTransactionCounter(TraceContext traceContext) {
-        if (traceContext instanceof DefaultTraceContext) {
-            return ((DefaultTraceContext) traceContext).getTransactionCounter();
-        }
-        return null;
-    }
-    
-    public DynamicTransformService getDynamicTransformService() {
-        return dynamicTransformService;
+    this.interceptorRegistryBinder = interceptorRegistryBinder;
+    interceptorRegistryBinder.bind();
+    this.serviceTypeRegistryService = agentOption.getServiceTypeRegistryService();
+
+    dumpSystemProperties();
+    dumpConfig(agentOption.getProfilerConfig());
+
+    changeStatus(AgentStatus.INITIALIZING);
+
+    this.profilerConfig = agentOption.getProfilerConfig();
+    this.instrumentation = agentOption.getInstrumentation();
+    this.classPool =
+        new JavassistClassPool(interceptorRegistryBinder, agentOption.getBootStrapJarPath());
+
+    if (logger.isInfoEnabled()) {
+      logger.info("DefaultAgent classLoader:{}", this.getClass().getClassLoader());
     }
 
-    public Instrumentation getInstrumentation() {
-        return instrumentation;
+    pluginContexts = loadPlugins(agentOption);
+
+    this.classFileTransformer = new ClassFileTransformerDispatcher(this, pluginContexts);
+    this.dynamicTransformService =
+        new DynamicTransformService(instrumentation, classFileTransformer);
+
+    instrumentation.addTransformer(this.classFileTransformer, true);
+
+    String applicationServerTypeString = profilerConfig.getApplicationServerType();
+    ServiceType applicationServerType =
+        this.serviceTypeRegistryService.findServiceTypeByName(applicationServerTypeString);
+
+    final ApplicationServerTypeResolver typeResolver = new ApplicationServerTypeResolver(
+        pluginContexts, applicationServerType, profilerConfig.getApplicationTypeDetectOrder());
+
+    final AgentInformationFactory agentInformationFactory = new AgentInformationFactory();
+    this.agentInformation = agentInformationFactory.createAgentInformation(typeResolver.resolve());
+    logger.info("agentInformation:{}", agentInformation);
+
+    CommandDispatcher commandDispatcher = new CommandDispatcher();
+
+    this.tcpDataSender = createTcpDataSender(commandDispatcher);
+
+    this.serverMetaDataHolder = createServerMetaDataHolder();
+
+    this.spanDataSender = createUdpSpanDataSender(this.profilerConfig.getCollectorSpanServerPort(),
+        "Pinpoint-UdpSpanDataExecutor", this.profilerConfig.getSpanDataSenderWriteQueueSize(),
+        this.profilerConfig.getSpanDataSenderSocketTimeout(),
+        this.profilerConfig.getSpanDataSenderSocketSendBufferSize());
+    this.statDataSender = createUdpStatDataSender(this.profilerConfig.getCollectorStatServerPort(),
+        "Pinpoint-UdpStatDataExecutor", this.profilerConfig.getStatDataSenderWriteQueueSize(),
+        this.profilerConfig.getStatDataSenderSocketTimeout(),
+        this.profilerConfig.getStatDataSenderSocketSendBufferSize());
+
+    this.traceContext = createTraceContext();
+
+    addCommandService(commandDispatcher, traceContext);
+
+    this.agentInfoSender = new AgentInfoSender.Builder(tcpDataSender, this.agentInformation)
+        .sendInterval(profilerConfig.getAgentInfoSendRetryInterval()).build();
+    this.serverMetaDataHolder.addListener(this.agentInfoSender);
+
+    AgentStatCollectorFactory agentStatCollectorFactory =
+        new AgentStatCollectorFactory(this.getTransactionCounter(this.traceContext));
+    this.agentStatMonitor =
+        new AgentStatMonitor(this.statDataSender, this.agentInformation.getAgentId(),
+            this.agentInformation.getStartTime(), agentStatCollectorFactory);
+
+    InterceptorInvokerHelper
+        .setPropagateException(profilerConfig.isPropagateInterceptorException());
+  }
+
+  protected List<DefaultProfilerPluginContext> loadPlugins(AgentOption agentOption) {
+    return new ProfilerPluginLoader(this).load(agentOption.getPluginJars());
+  }
+
+  private void addCommandService(CommandDispatcher commandDispatcher, TraceContext traceContext) {
+    commandDispatcher.registerCommandService(new ThreadDumpService());
+    commandDispatcher.registerCommandService(new EchoService());
+
+    if (traceContext instanceof DefaultTraceContext) {
+      ActiveTraceLocator activeTraceLocator =
+          ((DefaultTraceContext) traceContext).getActiveTraceLocator();
+      if (activeTraceLocator != null) {
+        commandDispatcher.registerCommandService(new ActiveThreadService(activeTraceLocator));
+      }
+    }
+  }
+
+  private TransactionCounter getTransactionCounter(TraceContext traceContext) {
+    if (traceContext instanceof DefaultTraceContext) {
+      return ((DefaultTraceContext) traceContext).getTransactionCounter();
+    }
+    return null;
+  }
+
+  public DynamicTransformService getDynamicTransformService() {
+    return dynamicTransformService;
+  }
+
+  public Instrumentation getInstrumentation() {
+    return instrumentation;
+  }
+
+  public ClassFileTransformerDispatcher getClassFileTransformerDispatcher() {
+    return classFileTransformer;
+  }
+
+  public JavassistClassPool getClassPool() {
+    return classPool;
+  }
+
+  private void dumpSystemProperties() {
+    if (logger.isInfoEnabled()) {
+      Properties properties = System.getProperties();
+      Set<String> strings = properties.stringPropertyNames();
+      for (String key : strings) {
+        logger.info("SystemProperties {}={}", key, properties.get(key));
+      }
+    }
+  }
+
+  private void dumpConfig(ProfilerConfig profilerConfig) {
+    if (logger.isInfoEnabled()) {
+      logger.info("{}\n{}", "dumpConfig", profilerConfig);
+
+    }
+  }
+
+  public ProfilerConfig getProfilerConfig() {
+    return profilerConfig;
+  }
+
+  private void changeStatus(AgentStatus status) {
+    this.agentStatus = status;
+    if (logger.isDebugEnabled()) {
+      logger.debug("Agent status is changed. {}", status);
+    }
+  }
+
+  private void bindPLoggerFactory(PLoggerBinder binder) {
+    final String binderClassName = binder.getClass().getName();
+    PLogger pLogger = binder.getLogger(binder.getClass().getName());
+    pLogger.info("PLoggerFactory.initialize() bind:{} cl:{}", binderClassName,
+        binder.getClass().getClassLoader());
+    // Set binder to static LoggerFactory
+    // Should we unset binder at shutdown hook or stop()?
+    PLoggerFactory.initialize(binder);
+  }
+
+  private TraceContext createTraceContext() {
+    final StorageFactory storageFactory = createStorageFactory();
+    logger.info("StorageFactoryType:{}", storageFactory);
+
+    final Sampler sampler = createSampler();
+    logger.info("SamplerType:{}", sampler);
+
+    final int jdbcSqlCacheSize = profilerConfig.getJdbcSqlCacheSize();
+    final boolean traceActiveThread = profilerConfig.isTraceAgentActiveThread();
+    final DefaultTraceContext traceContext =
+        new DefaultTraceContext(jdbcSqlCacheSize, this.agentInformation, storageFactory, sampler,
+            this.serverMetaDataHolder, traceActiveThread);
+    traceContext.setPriorityDataSender(this.tcpDataSender);
+    traceContext.setProfilerConfig(profilerConfig);
+
+    return traceContext;
+  }
+
+  protected StorageFactory createStorageFactory() {
+    if (profilerConfig.isIoBufferingEnable()) {
+      return new BufferedStorageFactory(this.spanDataSender, this.profilerConfig,
+          this.agentInformation);
+    } else {
+      return new SpanStorageFactory(spanDataSender);
+
+    }
+  }
+
+  private Sampler createSampler() {
+    boolean samplingEnable = this.profilerConfig.isSamplingEnable();
+    int samplingRate = this.profilerConfig.getSamplingRate();
+
+    SamplerFactory samplerFactory = new SamplerFactory();
+    return samplerFactory.createSampler(samplingEnable, samplingRate);
+  }
+
+  protected ServerMetaDataHolder createServerMetaDataHolder() {
+    List<String> vmArgs = RuntimeMXBeanUtils.getVmArgs();
+    ServerMetaDataHolder serverMetaDataHolder = new DefaultServerMetaDataHolder(vmArgs);
+    return serverMetaDataHolder;
+  }
+
+  protected PinpointClientFactory createPinpointClientFactory(CommandDispatcher commandDispatcher) {
+    PinpointClientFactory pinpointClientFactory = new PinpointClientFactory();
+    pinpointClientFactory.setTimeoutMillis(1000 * 5);
+
+    Map<String, Object> properties = this.agentInformation.toMap();
+
+    boolean isSupportServerMode = this.profilerConfig.isTcpDataSenderCommandAcceptEnable();
+
+    if (isSupportServerMode) {
+      pinpointClientFactory.setMessageListener(commandDispatcher);
+      pinpointClientFactory.setServerStreamChannelMessageListener(commandDispatcher);
+
+      properties.put(AgentHandshakePropertyType.SUPPORT_SERVER.getName(), true);
+    } else {
+      properties.put(AgentHandshakePropertyType.SUPPORT_SERVER.getName(), false);
     }
 
-    public ClassFileTransformerDispatcher getClassFileTransformerDispatcher() {
-        return classFileTransformer;
+    pinpointClientFactory.setProperties(properties);
+    return pinpointClientFactory;
+  }
+
+  protected EnhancedDataSender createTcpDataSender(CommandDispatcher commandDispatcher) {
+    this.clientFactory = createPinpointClientFactory(commandDispatcher);
+    this.client =
+        ClientFactoryUtils.createPinpointClient(this.profilerConfig.getCollectorTcpServerIp(),
+            this.profilerConfig.getCollectorTcpServerPort(), clientFactory);
+    return new TcpDataSender(client);
+  }
+
+  protected DataSender createUdpStatDataSender(int port, String threadName, int writeQueueSize,
+      int timeout, int sendBufferSize) {
+    return new UdpDataSender(this.profilerConfig.getCollectorStatServerIp(), port, threadName,
+        writeQueueSize, timeout, sendBufferSize);
+  }
+
+  protected DataSender createUdpSpanDataSender(int port, String threadName, int writeQueueSize,
+      int timeout, int sendBufferSize) {
+    return new UdpDataSender(this.profilerConfig.getCollectorSpanServerIp(), port, threadName,
+        writeQueueSize, timeout, sendBufferSize);
+  }
+
+  protected EnhancedDataSender getTcpDataSender() {
+    return tcpDataSender;
+  }
+
+  protected DataSender getStatDataSender() {
+    return statDataSender;
+  }
+
+  protected DataSender getSpanDataSender() {
+    return spanDataSender;
+  }
+
+  public TraceContext getTraceContext() {
+    return traceContext;
+  }
+
+  public AgentInformation getAgentInformation() {
+    return agentInformation;
+  }
+
+  public ServiceTypeRegistryService getServiceTypeRegistryService() {
+    return serviceTypeRegistryService;
+  }
+
+  @Override
+  public void start() {
+    synchronized (this) {
+      if (this.agentStatus == AgentStatus.INITIALIZING) {
+        changeStatus(AgentStatus.RUNNING);
+      } else {
+        logger.warn("Agent already started.");
+        return;
+      }
     }
-    
-    public JavassistClassPool getClassPool() {
-        return classPool;
+    logger.info("Starting {} Agent.", ProductInfo.NAME);
+    this.agentInfoSender.start();
+    this.agentStatMonitor.start();
+  }
+
+  @Override
+  public void stop() {
+    synchronized (this) {
+      if (this.agentStatus == AgentStatus.RUNNING) {
+        changeStatus(AgentStatus.STOPPED);
+      } else {
+        logger.warn("Cannot stop agent. Current status = [{}]", this.agentStatus);
+        return;
+      }
     }
+    logger.info("Stopping {} Agent.", ProductInfo.NAME);
 
-    private void dumpSystemProperties() {
-        if (logger.isInfoEnabled()) {
-            Properties properties = System.getProperties();
-            Set<String> strings = properties.stringPropertyNames();
-            for (String key : strings) {
-                logger.info("SystemProperties {}={}", key, properties.get(key));
-            }
-        }
+    this.agentInfoSender.stop();
+    this.agentStatMonitor.stop();
+
+    // Need to process stop
+    this.spanDataSender.stop();
+    this.statDataSender.stop();
+
+    closeTcpDataSender();
+
+    PLoggerFactory.unregister(this.binder);
+    this.interceptorRegistryBinder.unbind();
+  }
+
+  private void closeTcpDataSender() {
+    if (this.tcpDataSender != null) {
+      this.tcpDataSender.stop();
     }
-
-    private void dumpConfig(ProfilerConfig profilerConfig) {
-        if (logger.isInfoEnabled()) {
-            logger.info("{}\n{}", "dumpConfig", profilerConfig);
-
-        }
+    if (this.client != null) {
+      this.client.close();
     }
-
-    public ProfilerConfig getProfilerConfig() {
-        return profilerConfig;
+    if (this.clientFactory != null) {
+      this.clientFactory.release();
     }
-
-    private void changeStatus(AgentStatus status) {
-        this.agentStatus = status;
-        if (logger.isDebugEnabled()) {
-            logger.debug("Agent status is changed. {}", status);
-        }
-    }
-
-    private void bindPLoggerFactory(PLoggerBinder binder) {
-        final String binderClassName = binder.getClass().getName();
-        PLogger pLogger = binder.getLogger(binder.getClass().getName());
-        pLogger.info("PLoggerFactory.initialize() bind:{} cl:{}", binderClassName, binder.getClass().getClassLoader());
-        // Set binder to static LoggerFactory
-        // Should we unset binder at shutdown hook or stop()?
-        PLoggerFactory.initialize(binder);
-    }
-
-    private TraceContext createTraceContext() {
-        final StorageFactory storageFactory = createStorageFactory();
-        logger.info("StorageFactoryType:{}", storageFactory);
-
-        final Sampler sampler = createSampler();
-        logger.info("SamplerType:{}", sampler);
-        
-        final int jdbcSqlCacheSize = profilerConfig.getJdbcSqlCacheSize();
-        final boolean traceActiveThread = profilerConfig.isTraceAgentActiveThread();
-        final DefaultTraceContext traceContext = new DefaultTraceContext(jdbcSqlCacheSize, this.agentInformation, storageFactory, sampler, this.serverMetaDataHolder, traceActiveThread);
-        traceContext.setPriorityDataSender(this.tcpDataSender);
-        traceContext.setProfilerConfig(profilerConfig);
-
-        return traceContext;
-    }
-
-    protected StorageFactory createStorageFactory() {
-        if (profilerConfig.isIoBufferingEnable()) {
-            return new BufferedStorageFactory(this.spanDataSender, this.profilerConfig, this.agentInformation);
-        } else {
-            return new SpanStorageFactory(spanDataSender);
-
-        }
-    }
-
-    private Sampler createSampler() {
-        boolean samplingEnable = this.profilerConfig.isSamplingEnable();
-        int samplingRate = this.profilerConfig.getSamplingRate();
-
-        SamplerFactory samplerFactory = new SamplerFactory();
-        return samplerFactory.createSampler(samplingEnable, samplingRate);
-    }
-    
-    protected ServerMetaDataHolder createServerMetaDataHolder() {
-        List<String> vmArgs = RuntimeMXBeanUtils.getVmArgs();
-        ServerMetaDataHolder serverMetaDataHolder = new DefaultServerMetaDataHolder(vmArgs);
-        return serverMetaDataHolder;
-    }
-
-    protected PinpointClientFactory createPinpointClientFactory(CommandDispatcher commandDispatcher) {
-        PinpointClientFactory pinpointClientFactory = new PinpointClientFactory();
-        pinpointClientFactory.setTimeoutMillis(1000 * 5);
-
-        Map<String, Object> properties = this.agentInformation.toMap();
-        
-        boolean isSupportServerMode = this.profilerConfig.isTcpDataSenderCommandAcceptEnable();
-        
-        if (isSupportServerMode) {
-            pinpointClientFactory.setMessageListener(commandDispatcher);
-            pinpointClientFactory.setServerStreamChannelMessageListener(commandDispatcher);
-
-            properties.put(AgentHandshakePropertyType.SUPPORT_SERVER.getName(), true);
-        } else {
-            properties.put(AgentHandshakePropertyType.SUPPORT_SERVER.getName(), false);
-        }
-
-        pinpointClientFactory.setProperties(properties);
-        return pinpointClientFactory;
-    }
-
-    protected EnhancedDataSender createTcpDataSender(CommandDispatcher commandDispatcher) {
-        this.clientFactory = createPinpointClientFactory(commandDispatcher);
-        this.client = ClientFactoryUtils.createPinpointClient(this.profilerConfig.getCollectorTcpServerIp(), this.profilerConfig.getCollectorTcpServerPort(), clientFactory);
-        return new TcpDataSender(client);
-    }
-
-    protected DataSender createUdpStatDataSender(int port, String threadName, int writeQueueSize, int timeout, int sendBufferSize) {
-        return new UdpDataSender(this.profilerConfig.getCollectorStatServerIp(), port, threadName, writeQueueSize, timeout, sendBufferSize);
-    }
-    
-    protected DataSender createUdpSpanDataSender(int port, String threadName, int writeQueueSize, int timeout, int sendBufferSize) {
-        return new UdpDataSender(this.profilerConfig.getCollectorSpanServerIp(), port, threadName, writeQueueSize, timeout, sendBufferSize);
-    }
-
-    protected EnhancedDataSender getTcpDataSender() {
-        return tcpDataSender;
-    }
-
-    protected DataSender getStatDataSender() {
-        return statDataSender;
-    }
-
-    protected DataSender getSpanDataSender() {
-        return spanDataSender;
-    }
-
-    public TraceContext getTraceContext() {
-        return traceContext;
-    }
-
-    public AgentInformation getAgentInformation() {
-        return agentInformation;
-    }
-    
-    public ServiceTypeRegistryService getServiceTypeRegistryService() {
-        return serviceTypeRegistryService;
-    }
-    
-    @Override
-    public void start() {
-        synchronized (this) {
-            if (this.agentStatus == AgentStatus.INITIALIZING) {
-                changeStatus(AgentStatus.RUNNING);
-            } else {
-                logger.warn("Agent already started.");
-                return;
-            }
-        }
-        logger.info("Starting {} Agent.", ProductInfo.NAME);
-        this.agentInfoSender.start();
-        this.agentStatMonitor.start();
-    }
-
-    @Override
-    public void stop() {
-        synchronized (this) {
-            if (this.agentStatus == AgentStatus.RUNNING) {
-                changeStatus(AgentStatus.STOPPED);
-            } else {
-                logger.warn("Cannot stop agent. Current status = [{}]", this.agentStatus);
-                return;
-            }
-        }
-        logger.info("Stopping {} Agent.", ProductInfo.NAME);
-
-        this.agentInfoSender.stop();
-        this.agentStatMonitor.stop();
-
-        // Need to process stop
-        this.spanDataSender.stop();
-        this.statDataSender.stop();
-
-        closeTcpDataSender();
-
-        PLoggerFactory.unregister(this.binder);
-        this.interceptorRegistryBinder.unbind();
-    }
-
-    private void closeTcpDataSender() {
-        if (this.tcpDataSender != null) {
-            this.tcpDataSender.stop();
-        }
-        if (this.client != null) {
-            this.client.close();
-        }
-        if (this.clientFactory != null) {
-            this.clientFactory.release();
-        }
-    }
+  }
 
 }
