@@ -24,31 +24,36 @@ import com.navercorp.pinpoint.bootstrap.interceptor.Interceptor;
  */
 public final class InterceptorRegistry {
 
-    private static final Locker LOCK = new DefaultLocker();
+  private static final Locker LOCK = new DefaultLocker();
 
-    private static InterceptorRegistryAdaptor REGISTRY;
+  private static InterceptorRegistryAdaptor REGISTRY;
 
-    public static void bind(final InterceptorRegistryAdaptor interceptorRegistryAdaptor, final Object lock) {
-        if (interceptorRegistryAdaptor == null) {
-            throw new NullPointerException("interceptorRegistryAdaptor must not be null");
-        }
-        
-        if (LOCK.lock(lock)) {
-            REGISTRY = interceptorRegistryAdaptor;
-        } else {
-            throw new IllegalStateException("bind failed.");
-        }
+  public static void bind(final InterceptorRegistryAdaptor interceptorRegistryAdaptor,
+      final Object lock) {
+    if (interceptorRegistryAdaptor == null) {
+      throw new NullPointerException("interceptorRegistryAdaptor must not be null");
     }
 
-    public static void unbind(final Object lock) {
-        if (LOCK.unlock(lock)) {
-            REGISTRY = null;
-        } else {
-            throw new IllegalStateException("unbind failed.");
-        }
+    if (LOCK.lock(lock)) {
+      REGISTRY = interceptorRegistryAdaptor;
+    } else {
+      throw new IllegalStateException("bind failed.");
     }
+  }
 
-    public static Interceptor getInterceptor(int key) {
-        return REGISTRY.getInterceptor(key);
+  public static void unbind(final Object lock) {
+    if (LOCK.unlock(lock)) {
+      REGISTRY = null;
+    } else {
+      throw new IllegalStateException("unbind failed.");
     }
+  }
+
+  public static Interceptor getInterceptor(int key) {
+    return REGISTRY.getInterceptor(key);
+  }
+
+  public static int addInterceptor(Interceptor interceptor) {
+    return REGISTRY.addInterceptor(interceptor);
+  }
 }
