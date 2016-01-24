@@ -1,7 +1,7 @@
-cd profiler
-mvn -o clean install  -Dmaven.test.skip=true
-cd ../bootstrap-core
+cd bootstrap-core
 mvn -o clean install -Dmaven.test.skip=true
+cd ../profiler
+mvn -o clean install  -Dmaven.test.skip=true
 cd ../plugins
 mvn -o clean install -Dmaven.test.skip=true
 cd ../agent

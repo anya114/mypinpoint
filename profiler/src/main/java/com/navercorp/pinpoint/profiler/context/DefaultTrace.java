@@ -253,8 +253,13 @@ public final class DefaultTrace implements Trace {
       logger.trace("[DefaultTrace] Write {} thread{id={}, name={}}", spanEvent, th.getId(),
           th.getName());
     }
-//    if(spanEvent.getEndElapsed() != 0)
-      this.storage.store(spanEvent);
+    if (logger.isDebugEnabled()) {
+      final Thread th = Thread.currentThread();
+      logger.debug("[DefaultTrace] Write {} thread{id={}, name={}}", spanEvent, th.getId(),
+          th.getName());
+    }
+    //    if (spanEvent.getEndElapsed() != 0)
+    this.storage.store(spanEvent);
   }
 
   private void logSpan(Span span) {
@@ -263,6 +268,7 @@ public final class DefaultTrace implements Trace {
       logger
           .trace("[DefaultTrace] Write {} thread{id={}, name={}}", span, th.getId(), th.getName());
     }
+    //    if (span.getElapsed() > 0)
     this.storage.store(span);
   }
 

@@ -30,6 +30,7 @@ import com.navercorp.pinpoint.profiler.plugin.DefaultProfilerPluginContext;
 import com.navercorp.pinpoint.profiler.plugin.MatchableClassFileTransformerGuardDelegate;
 import com.navercorp.pinpoint.profiler.plugin.xml.transformer.MatchableClassFileTransformer;
 import com.navercorp.pinpoint.profiler.util.JavaAssistUtils;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +53,7 @@ public class ClassFileTransformerDispatcher
   private final TransformerRegistry transformerRegistry;
   private final DynamicTransformerRegistry dynamicTransformerRegistry;
 
-  private final DefaultProfilerPluginContext globalContext;
+  @Getter private final DefaultProfilerPluginContext globalContext;
   private final Filter<String> debugTargetFilter;
   private final DebugTransformer debugTransformer;
 
@@ -82,6 +83,18 @@ public class ClassFileTransformerDispatcher
   @Override public byte[] transform(ClassLoader classLoader, String jvmClassName,
       Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classFileBuffer)
       throws IllegalClassFormatException {
+    if (jvmClassName.contains("BroadleafSearchController")) {
+      logger.info("transform BroadleafSearchController");
+    }
+    if (jvmClassName.contains("OrderService")) {
+      logger.info("transform OrderService class: {}", jvmClassName);
+    }
+    if (jvmClassName.contains("OrderServiceImpl")) {
+      logger.info("transform OrderServiceImpl class: {}", jvmClassName);
+    }
+    if (jvmClassName.contains("LegacyOrderService")) {
+      logger.info("transform LegacyOrderService class: {}", jvmClassName);
+    }
     if (!pinpointClassFilter
         .accept(classLoader, jvmClassName, classBeingRedefined, protectionDomain,
             classFileBuffer)) {
@@ -94,12 +107,15 @@ public class ClassFileTransformerDispatcher
     InstrumentClass instrumentClass = globalContext
         .getInstrumentClass(classLoader, JavaAssistUtils.jvmNameToJavaName(jvmClassName),
             classFileBuffer);
-    ensureInClassRepository(JavaAssistUtils.jvmNameToJavaName(jvmClassName), classLoader);
+    ClassRepository.ClassId thisId =
+        ClassRepository.ClassId.of(JavaAssistUtils.jvmNameToJavaName(jvmClassName), classLoader);
+    addToClassRepository(classLoader, JavaAssistUtils.jvmNameToJavaName(jvmClassName), null);
 
     //check the interface is instrumented
     if (instrumentClass != null) {
-      updateInterfaceLink(instrumentClass, instrumentClass.getInterfaces(), classLoader);
-      updateSuperClassLink(instrumentClass, instrumentClass.getSuperClass(), classLoader);
+      ClassRepository.ClassMirror thisMirror = classRepository.findOne(thisId).get();
+      updateInterfaceLink(thisMirror, instrumentClass.getInterfaces(), classLoader);
+      updateSuperClassLink(thisMirror, instrumentClass.getSuperClass(), classLoader);
       String[] interfaces = instrumentClass.getInterfaces();
       for (String interfaceName : interfaces) {
         ClassFileTransformer transformer = transformerRegistry.findTransformer(interfaceName);
@@ -131,29 +147,23 @@ public class ClassFileTransformerDispatcher
         classFileBuffer, transformer);
   }
 
-
-  private void ensureInClassRepository(String className, ClassLoader classLoader) {
-    ClassRepository.ClassId targetId = ClassRepository.ClassId.of(className, classLoader);
-    if (!classRepository.findOne(targetId).isPresent()) {
-      classRepository.add(targetId, new ClassRepository.ClassMirror(targetId));
-    }
-  }
-
-
-  private void updateSuperClassLink(InstrumentClass target, String superClass,
+  private void updateSuperClassLink(ClassRepository.ClassMirror target, String superClass,
       ClassLoader classLoader) {
     if (!superClass.equals(Object.class.getName())) {
-      ensureInClassRepository(superClass, classLoader);
+      addToClassRepository(classLoader, superClass, null);
       ClassRepository.ClassMirror superClassMirror =
           classRepository.findOne(ClassRepository.ClassId.of(superClass, classLoader)).get();
       superClassMirror.addSubClass(target);
     }
   }
 
-  private void updateInterfaceLink(InstrumentClass target, String[] interfaces,
+  private void updateInterfaceLink(ClassRepository.ClassMirror target, String[] interfaces,
       ClassLoader classLoader) {
     for (String interfaceName : interfaces) {
-      ensureInClassRepository(interfaceName, classLoader);
+      if (interfaceName.equals("org.broadleafcommerce.core.order.service.OrderService")) {
+        logger.info("link OrderService interface");
+      }
+      addToClassRepository(classLoader, interfaceName, null);
       ClassRepository.ClassMirror interfaceMirror =
           classRepository.findOne(ClassRepository.ClassId.of(interfaceName, classLoader)).get();
       interfaceMirror.addImplClass(target);

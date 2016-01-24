@@ -25,29 +25,27 @@ import com.navercorp.pinpoint.bootstrap.interceptor.registry.InterceptorRegistry
  */
 public class DefaultInterceptorRegistryBinder implements InterceptorRegistryBinder {
 
-    private final Object lock;
-    private final InterceptorRegistryAdaptor interceptorRegistryAdaptor = new DefaultInterceptorRegistryAdaptor();
+  private final Object lock;
+  private final InterceptorRegistryAdaptor interceptorRegistryAdaptor =
+      new DefaultInterceptorRegistryAdaptor();
 
-    public DefaultInterceptorRegistryBinder() {
-        this.lock = new Object();
-    }
+  public DefaultInterceptorRegistryBinder() {
+    this.lock = new Object();
+  }
 
-    @Override
-    public void bind() {
-        InterceptorRegistry.bind(interceptorRegistryAdaptor, lock);
-    }
+  @Override public void bind() {
+    InterceptorRegistry.bind(interceptorRegistryAdaptor, lock);
+  }
 
-    @Override
-    public void unbind() {
-        InterceptorRegistry.unbind(lock);
-    }
+  @Override public void unbind() {
+    InterceptorRegistry.unbind(lock);
+  }
 
-    public InterceptorRegistryAdaptor getInterceptorRegistryAdaptor() {
-        return interceptorRegistryAdaptor;
-    }
+  public InterceptorRegistryAdaptor getInterceptorRegistryAdaptor() {
+    return interceptorRegistryAdaptor;
+  }
 
-    @Override
-    public String getInterceptorRegistryClassName() {
-        return InterceptorRegistry.class.getName();
-    }
+  @Override public String getInterceptorRegistryClassName() {
+    return InterceptorRegistry.class.getName();
+  }
 }

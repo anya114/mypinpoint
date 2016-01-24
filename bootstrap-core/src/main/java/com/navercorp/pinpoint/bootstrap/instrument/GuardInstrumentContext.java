@@ -21,6 +21,8 @@ import com.navercorp.pinpoint.bootstrap.context.TraceContext;
 import com.navercorp.pinpoint.bootstrap.instrument.transformer.TransformCallback;
 import com.navercorp.pinpoint.bootstrap.interceptor.scope.InterceptorScope;
 
+import java.lang.instrument.ClassDefinition;
+
 /**
  * @author Woonduk Kang(emeroad)
  */
@@ -82,6 +84,11 @@ public class GuardInstrumentContext implements InstrumentContext {
     public void retransform(Class<?> target, TransformCallback transformCallback) {
         checkOpen();
         instrumentContext.retransform(target, transformCallback);
+    }
+
+    @Override public void redefine(ClassDefinition classDefinition) {
+        checkOpen();
+        instrumentContext.redefine(classDefinition);
     }
 
     public void close() {

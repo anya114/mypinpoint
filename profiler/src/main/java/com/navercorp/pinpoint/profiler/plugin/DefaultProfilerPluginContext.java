@@ -14,7 +14,9 @@
 
 package com.navercorp.pinpoint.profiler.plugin;
 
+import java.lang.instrument.ClassDefinition;
 import java.lang.instrument.ClassFileTransformer;
+import java.lang.instrument.UnmodifiableClassException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -159,6 +161,14 @@ public class DefaultProfilerPluginContext implements ProfilerPluginSetupContext,
 
     final DynamicTransformService dynamicTransformService = agent.getDynamicTransformService();
     dynamicTransformService.retransform(target, classFileTransformerGuardDelegate);
+  }
+
+  @Override public void redefine(ClassDefinition classDefinition) {
+    try {
+      agent.getInstrumentation().redefineClasses(classDefinition);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
 

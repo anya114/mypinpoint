@@ -18,6 +18,7 @@ package com.navercorp.pinpoint.bootstrap.instrument;
 
 import com.navercorp.pinpoint.bootstrap.interceptor.scope.ExecutionPolicy;
 import com.navercorp.pinpoint.bootstrap.interceptor.scope.InterceptorScope;
+import com.navercorp.pinpoint.bootstrap.plugin.faultinject.FaultInjector;
 
 import java.util.List;
 
@@ -132,5 +133,6 @@ public interface InstrumentClass {
 
   byte[] toBytecode() throws InstrumentException;
 
-
+  void addFaultInjector(MethodFilter methodFilter, FaultInjector faultInjector)
+      throws InstrumentException;
 }

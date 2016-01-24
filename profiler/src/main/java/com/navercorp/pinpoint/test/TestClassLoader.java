@@ -14,6 +14,7 @@
 
 package com.navercorp.pinpoint.test;
 
+import java.lang.instrument.ClassFileTransformer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -49,8 +50,15 @@ public class TestClassLoader extends Loader {
     this.context = new DefaultProfilerPluginContext(agent,
         new LegacyProfilerPluginClassInjector(getClass().getClassLoader()));
     this.instrumentTranslator =
-        new InstrumentTranslator(this, agent.getClassFileTransformerDispatcher());
+        new InstrumentTranslator(this, getTransformer(agent));
     this.delegateClass = new ArrayList<String>();
+  }
+
+  private List<ClassFileTransformer> getTransformer(DefaultAgent agent) {
+    List<ClassFileTransformer> transformers = new ArrayList<ClassFileTransformer>();
+    transformers.add(agent.getFaultInjectClassFileTransformer());
+    transformers.add(agent.getClassFileTransformerDispatcher());
+    return transformers;
   }
 
 

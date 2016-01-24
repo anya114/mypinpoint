@@ -19,7 +19,6 @@ package com.navercorp.pinpoint.profiler.context;
 
 import com.navercorp.pinpoint.bootstrap.context.TraceContext;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -30,30 +29,31 @@ import org.mockito.Mockito;
 public class WrappedSpanEventRecorderTest {
 
 
-    @Test
-    public void testSetExceptionInfo_RootMarkError() throws Exception {
-        Span span = new Span();
-        SpanEvent spanEvent = new SpanEvent(span);
-        TraceContext traceContext = Mockito.mock(TraceContext.class);
+  @Test public void testSetExceptionInfo_RootMarkError() throws Exception {
+    Span span = new Span();
+    SpanEvent spanEvent = new SpanEvent(span);
+    TraceContext traceContext = Mockito.mock(TraceContext.class);
 
-        WrappedSpanEventRecorder recorder = new WrappedSpanEventRecorder(traceContext);
-        recorder.setWrapped(spanEvent);
+    WrappedSpanEventRecorder recorder = new WrappedSpanEventRecorder(traceContext);
+    recorder.setWrapped(spanEvent);
 
-        final String exceptionMessage1 = "exceptionMessage1";
-        final Exception exception1 = new Exception(exceptionMessage1);
-        recorder.recordException(false, exception1);
+    final String exceptionMessage1 = "exceptionMessage1";
+    final Exception exception1 = new Exception(exceptionMessage1);
+    recorder.recordException(false, exception1);
 
-        Assert.assertEquals("Exception recoding", exceptionMessage1, spanEvent.getExceptionInfo().getStringValue());
-        Assert.assertFalse("markRootError=false", span.isSetErrCode());
+    Assert.assertEquals("Exception recoding", exceptionMessage1,
+        spanEvent.getExceptionInfo().getStringValue());
+    Assert.assertFalse("markRootError=false", span.isSetErrCode());
 
 
-        final String exceptionMessage2 = "exceptionMessage2";
-        final Exception exception2 = new Exception(exceptionMessage2);
-        recorder.recordException(true, exception2);
+    final String exceptionMessage2 = "exceptionMessage2";
+    final Exception exception2 = new Exception(exceptionMessage2);
+    recorder.recordException(true, exception2);
 
-        Assert.assertEquals("Exception recoding", exceptionMessage2, spanEvent.getExceptionInfo().getStringValue());
-        Assert.assertTrue("markRootError=true", span.isSetErrCode());
-    }
+    Assert.assertEquals("Exception recoding", exceptionMessage2,
+        spanEvent.getExceptionInfo().getStringValue());
+    Assert.assertTrue("markRootError=true", span.isSetErrCode());
+  }
 
 
 }

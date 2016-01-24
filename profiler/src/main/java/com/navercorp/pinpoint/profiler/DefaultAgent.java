@@ -14,18 +14,6 @@
 
 package com.navercorp.pinpoint.profiler;
 
-import java.lang.instrument.Instrumentation;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-
-import com.navercorp.pinpoint.rpc.client.PinpointClient;
-import com.navercorp.pinpoint.rpc.util.ClientFactoryUtils;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.navercorp.pinpoint.ProductInfo;
 import com.navercorp.pinpoint.bootstrap.Agent;
 import com.navercorp.pinpoint.bootstrap.AgentOption;
@@ -36,6 +24,7 @@ import com.navercorp.pinpoint.bootstrap.interceptor.InterceptorInvokerHelper;
 import com.navercorp.pinpoint.bootstrap.logging.PLogger;
 import com.navercorp.pinpoint.bootstrap.logging.PLoggerBinder;
 import com.navercorp.pinpoint.bootstrap.logging.PLoggerFactory;
+import com.navercorp.pinpoint.bootstrap.plugin.faultinject.FaultInjectClassFileTransformer;
 import com.navercorp.pinpoint.bootstrap.sampler.Sampler;
 import com.navercorp.pinpoint.common.service.ServiceTypeRegistryService;
 import com.navercorp.pinpoint.common.trace.ServiceType;
@@ -66,7 +55,18 @@ import com.navercorp.pinpoint.profiler.sender.UdpDataSender;
 import com.navercorp.pinpoint.profiler.util.ApplicationServerTypeResolver;
 import com.navercorp.pinpoint.profiler.util.RuntimeMXBeanUtils;
 import com.navercorp.pinpoint.rpc.ClassPreLoader;
+import com.navercorp.pinpoint.rpc.client.PinpointClient;
 import com.navercorp.pinpoint.rpc.client.PinpointClientFactory;
+import com.navercorp.pinpoint.rpc.util.ClientFactoryUtils;
+import lombok.Getter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.instrument.Instrumentation;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
 
 /**
  * @author emeroad
@@ -108,6 +108,7 @@ public class DefaultAgent implements Agent {
   private final DynamicTransformService dynamicTransformService;
   private final List<DefaultProfilerPluginContext> pluginContexts;
 
+  @Getter private final FaultInjectClassFileTransformer faultInjectClassFileTransformer;
 
   static {
     // Preload classes related to pinpoint-rpc module.
@@ -160,18 +161,24 @@ public class DefaultAgent implements Agent {
 
     pluginContexts = loadPlugins(agentOption);
 
+
     this.classFileTransformer = new ClassFileTransformerDispatcher(this, pluginContexts);
+    this.faultInjectClassFileTransformer =
+        new FaultInjectClassFileTransformer(profilerConfig, classPool,
+            classFileTransformer.getGlobalContext());
     this.dynamicTransformService =
         new DynamicTransformService(instrumentation, classFileTransformer);
-
-    instrumentation.addTransformer(this.classFileTransformer, true);
+    if(agentOption.getProfilerConfig().faultInjectEnable())
+      instrumentation.addTransformer(faultInjectClassFileTransformer, true);
+    instrumentation.addTransformer(classFileTransformer, true);
 
     String applicationServerTypeString = profilerConfig.getApplicationServerType();
     ServiceType applicationServerType =
         this.serviceTypeRegistryService.findServiceTypeByName(applicationServerTypeString);
 
-    final ApplicationServerTypeResolver typeResolver = new ApplicationServerTypeResolver(
-        pluginContexts, applicationServerType, profilerConfig.getApplicationTypeDetectOrder());
+    final ApplicationServerTypeResolver typeResolver =
+        new ApplicationServerTypeResolver(pluginContexts, applicationServerType,
+            profilerConfig.getApplicationTypeDetectOrder());
 
     final AgentInformationFactory agentInformationFactory = new AgentInformationFactory();
     this.agentInformation = agentInformationFactory.createAgentInformation(typeResolver.resolve());
@@ -353,8 +360,8 @@ public class DefaultAgent implements Agent {
 
   protected EnhancedDataSender createTcpDataSender(CommandDispatcher commandDispatcher) {
     this.clientFactory = createPinpointClientFactory(commandDispatcher);
-    this.client =
-        ClientFactoryUtils.createPinpointClient(this.profilerConfig.getCollectorTcpServerIp(),
+    this.client = ClientFactoryUtils
+        .createPinpointClient(this.profilerConfig.getCollectorTcpServerIp(),
             this.profilerConfig.getCollectorTcpServerPort(), clientFactory);
     return new TcpDataSender(client);
   }
@@ -395,8 +402,7 @@ public class DefaultAgent implements Agent {
     return serviceTypeRegistryService;
   }
 
-  @Override
-  public void start() {
+  @Override public void start() {
     synchronized (this) {
       if (this.agentStatus == AgentStatus.INITIALIZING) {
         changeStatus(AgentStatus.RUNNING);
@@ -410,8 +416,7 @@ public class DefaultAgent implements Agent {
     this.agentStatMonitor.start();
   }
 
-  @Override
-  public void stop() {
+  @Override public void stop() {
     synchronized (this) {
       if (this.agentStatus == AgentStatus.RUNNING) {
         changeStatus(AgentStatus.STOPPED);

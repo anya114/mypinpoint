@@ -21,25 +21,30 @@ import com.navercorp.pinpoint.bootstrap.context.TraceContext;
 import com.navercorp.pinpoint.bootstrap.instrument.transformer.TransformCallback;
 import com.navercorp.pinpoint.bootstrap.interceptor.scope.InterceptorScope;
 
+import java.lang.instrument.ClassDefinition;
+
 /**
  * @author Woonduk Kang(emeroad)
  */
 public interface InstrumentContext {
 
-    TraceContext getTraceContext();
+  TraceContext getTraceContext();
 
-    InstrumentClass getInstrumentClass(ClassLoader classLoader, String className, byte[] classfileBuffer);
+  InstrumentClass getInstrumentClass(ClassLoader classLoader, String className,
+      byte[] classfileBuffer);
 
-    boolean exist(ClassLoader classLoader, String className);
+  boolean exist(ClassLoader classLoader, String className);
 
-    InterceptorScope getInterceptorScope(String name);
+  InterceptorScope getInterceptorScope(String name);
 
-    <T> Class<? extends T> injectClass(ClassLoader targetClassLoader, String className);
+  <T> Class<? extends T> injectClass(ClassLoader targetClassLoader, String className);
 
-    void addClassFileTransformer(ClassLoader classLoader, String targetClassName, TransformCallback transformCallback);
+  void addClassFileTransformer(ClassLoader classLoader, String targetClassName,
+      TransformCallback transformCallback);
 
-    void addClassFileTransformer(String targetClassName, TransformCallback transformCallback);
+  void addClassFileTransformer(String targetClassName, TransformCallback transformCallback);
 
-    void retransform(Class<?> target, TransformCallback transformCallback);
+  void retransform(Class<?> target, TransformCallback transformCallback);
 
+  void redefine(ClassDefinition classDefinition);
 }

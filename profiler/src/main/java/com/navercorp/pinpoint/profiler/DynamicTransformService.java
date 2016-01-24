@@ -77,7 +77,7 @@ public class DynamicTransformService implements DynamicTransformTrigger {
   private void triggerRetransform(Class<?> target) {
     try {
       instrumentation.retransformClasses(target);
-    } catch (UnmodifiableClassException e) {
+    } catch (Exception e) {
       throw new ProfilerException(e);
     }
   }

@@ -14,26 +14,22 @@
 
 package com.navercorp.pinpoint.profiler.instrument;
 
-import java.net.URL;
-import java.net.URLClassLoader;
-
-import com.navercorp.pinpoint.bootstrap.instrument.*;
-
+import com.navercorp.pinpoint.bootstrap.instrument.InstrumentClass;
+import com.navercorp.pinpoint.bootstrap.instrument.InstrumentClassPool;
+import com.navercorp.pinpoint.bootstrap.instrument.InstrumentContext;
+import com.navercorp.pinpoint.bootstrap.instrument.NotFoundInstrumentException;
 import com.navercorp.pinpoint.bootstrap.instrument.automation.ClassRepository;
-import javassist.ByteArrayClassPath;
-import javassist.ClassClassPath;
-import javassist.ClassPool;
-import javassist.CtClass;
-import javassist.NotFoundException;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.navercorp.pinpoint.exception.PinpointException;
 import com.navercorp.pinpoint.profiler.instrument.classpool.IsolateMultipleClassPool;
 import com.navercorp.pinpoint.profiler.instrument.classpool.MultipleClassPool;
 import com.navercorp.pinpoint.profiler.instrument.classpool.NamedClassPool;
 import com.navercorp.pinpoint.profiler.interceptor.registry.InterceptorRegistryBinder;
+import javassist.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.net.URL;
+import java.net.URLClassLoader;
 
 /**
  * @author emeroad
@@ -49,8 +45,7 @@ public class JavassistClassPool implements InstrumentClassPool {
 
   private final IsolateMultipleClassPool.EventListener classPoolEventListener =
       new IsolateMultipleClassPool.EventListener() {
-        @Override
-        public void onCreateClassPool(ClassLoader classLoader, NamedClassPool classPool) {
+        @Override public void onCreateClassPool(ClassLoader classLoader, NamedClassPool classPool) {
           dumpClassLoaderLibList(classLoader, classPool);
         }
 
@@ -86,8 +81,7 @@ public class JavassistClassPool implements InstrumentClassPool {
 
     this.childClassPool = new IsolateMultipleClassPool(classPoolEventListener,
         new IsolateMultipleClassPool.ClassPoolHandler() {
-          @Override
-          public void handleClassPool(NamedClassPool systemClassPool) {
+          @Override public void handleClassPool(NamedClassPool systemClassPool) {
             try {
               if (bootStrapJar != null) {
                 // append bootstarp-core
@@ -114,12 +108,13 @@ public class JavassistClassPool implements InstrumentClassPool {
   public InstrumentClass getClass(InstrumentContext instrumentContext, ClassLoader classLoader,
       String jvmInternalClassName, byte[] classFileBuffer) throws NotFoundInstrumentException {
     NamedClassPool classPool = getClassPool(classLoader);
-    if(classFileBuffer != null) {
+    if (classFileBuffer != null) {
       classPool.insertClassPath(new ByteArrayClassPath(jvmInternalClassName, classFileBuffer));
     }
     CtClass cc = getClass(classLoader, jvmInternalClassName);
     JavassistClass javassistClass =
-        new JavassistClass(instrumentContext, interceptorRegistryBinder, classLoader, cc);
+        new JavassistClass(instrumentContext, interceptorRegistryBinder, classLoader, cc,
+            classPool);
     return javassistClass;
   }
 
@@ -129,7 +124,9 @@ public class JavassistClassPool implements InstrumentClassPool {
     try {
       CtClass ctClass = classPool.get(className);
       ClassRepository.ClassId classId = ClassRepository.ClassId.of(className, classLoader);
-      classRepository.add(classId, new ClassRepository.ClassMirror(classId));
+      if (!classRepository.findOne(classId).isPresent()) {
+        classRepository.add(classId, new ClassRepository.ClassMirror(classId));
+      }
       return ctClass;
     } catch (NotFoundException e) {
       throw new NotFoundInstrumentException(className + " class not found. Cause:" + e.getMessage(),
@@ -149,14 +146,12 @@ public class JavassistClassPool implements InstrumentClassPool {
     return true;
   }
 
-  @Override
-  public boolean hasClass(ClassLoader classLoader, String classBinaryName) {
+  @Override public boolean hasClass(ClassLoader classLoader, String classBinaryName) {
     ClassPool classPool = getClassPool(classLoader);
     return hasClass(classBinaryName, classPool);
   }
 
-  @Override
-  public void appendToBootstrapClassPath(String jar) {
+  @Override public void appendToBootstrapClassPath(String jar) {
     try {
       getClassPool(null).appendClassPath(jar);
     } catch (NotFoundException e) {

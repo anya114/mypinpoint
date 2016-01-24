@@ -17,14 +17,17 @@ package com.navercorp.pinpoint.profiler.instrument;
 import com.navercorp.pinpoint.bootstrap.context.TraceContext;
 import com.navercorp.pinpoint.bootstrap.instrument.*;
 import com.navercorp.pinpoint.bootstrap.interceptor.annotation.*;
+import com.navercorp.pinpoint.bootstrap.interceptor.registry.InterceptorRegistry;
 import com.navercorp.pinpoint.bootstrap.interceptor.scope.ExecutionPolicy;
 import com.navercorp.pinpoint.bootstrap.interceptor.scope.InterceptorScope;
 import com.navercorp.pinpoint.bootstrap.plugin.ObjectFactory;
+import com.navercorp.pinpoint.bootstrap.plugin.faultinject.FaultInjector;
 import com.navercorp.pinpoint.common.util.Asserts;
 import com.navercorp.pinpoint.exception.PinpointException;
 import com.navercorp.pinpoint.profiler.instrument.AccessorAnalyzer.AccessorDetails;
 import com.navercorp.pinpoint.profiler.instrument.GetterAnalyzer.GetterDetails;
 import com.navercorp.pinpoint.profiler.instrument.aspect.AspectWeaverClass;
+import com.navercorp.pinpoint.profiler.instrument.classpool.NamedClassPool;
 import com.navercorp.pinpoint.profiler.interceptor.registry.InterceptorRegistryBinder;
 import com.navercorp.pinpoint.profiler.objectfactory.AutoBindingObjectFactory;
 import com.navercorp.pinpoint.profiler.objectfactory.InterceptorArgumentProvider;
@@ -50,14 +53,10 @@ public class JavassistClass implements InstrumentClass {
   private final boolean isDebug = logger.isDebugEnabled();
 
   private final InstrumentContext pluginContext;
-  // private final JavassistClassPool instrumentClassPool;
+  private final NamedClassPool namedClassPool;
   private final InterceptorRegistryBinder interceptorRegistryBinder;
   private final ClassLoader classLoader;
   private final CtClass ctClass;
-
-  /**
-   * ClassRepo reference
-   */
 
   private static final String FIELD_PREFIX = "_$PINPOINT$_";
   private static final String SETTER_PREFIX = "_$PINPOINT$_set";
@@ -65,12 +64,13 @@ public class JavassistClass implements InstrumentClass {
 
 
   public JavassistClass(InstrumentContext pluginContext,
-      InterceptorRegistryBinder interceptorRegistryBinder, ClassLoader classLoader,
-      CtClass ctClass) {
+      InterceptorRegistryBinder interceptorRegistryBinder, ClassLoader classLoader, CtClass ctClass,
+      NamedClassPool classPool) {
     this.pluginContext = pluginContext;
     this.ctClass = ctClass;
     this.interceptorRegistryBinder = interceptorRegistryBinder;
     this.classLoader = classLoader;
+    this.namedClassPool = classPool;
   }
 
   public ClassLoader getClassLoader() {
@@ -78,7 +78,7 @@ public class JavassistClass implements InstrumentClass {
   }
 
   @Override public boolean isInterceptable() {
-    return !ctClass.isInterface() && !ctClass.isAnnotation();
+    return !ctClass.isInterface() && !ctClass.isAnnotation() && !ctClass.isFrozen();
   }
 
   @Override public boolean isInterface() {
@@ -335,6 +335,7 @@ public class JavassistClass implements InstrumentClass {
     try {
       byte[] bytes = ctClass.toBytecode();
       ctClass.detach();
+      namedClassPool.insertClassPath(new ByteArrayClassPath(ctClass.getName(), bytes));
       return bytes;
     } catch (IOException e) {
       logger.info("IoException class:{} Caused:{}", ctClass.getName(), e.getMessage(), e);
@@ -600,7 +601,7 @@ public class JavassistClass implements InstrumentClass {
     }
 
     if (interceptorId == -1) {
-      logger.warn("No methods are intercepted. target: " + ctClass.getName(),
+      logger.warn("No methods are intercepted. target: " + ctClass.getName() +
           ", interceptor: " + interceptorClassName + ", methodFilter: " + filterTypeName);
     }
 
@@ -705,7 +706,8 @@ public class JavassistClass implements InstrumentClass {
 
     for (CtClass nested : nestedClasses) {
       final InstrumentClass clazz =
-          new JavassistClass(pluginContext, interceptorRegistryBinder, classLoader, nested);
+          new JavassistClass(pluginContext, interceptorRegistryBinder, classLoader, nested,
+              namedClassPool);
       if (filter.accept(clazz)) {
         list.add(clazz);
       }
@@ -714,4 +716,13 @@ public class JavassistClass implements InstrumentClass {
     return list;
   }
 
+  @Override public void addFaultInjector(MethodFilter methodFilter, FaultInjector faultInjector)
+      throws InstrumentException {
+    List<InstrumentMethod> methods = getDeclaredMethods(methodFilter);
+    int injectorId = -1;
+    if (!methods.isEmpty())
+      injectorId = InterceptorRegistry.addInterceptor(faultInjector);
+    for (InstrumentMethod method : methods)
+      method.addFaultInjector(faultInjector, injectorId);
+  }
 }

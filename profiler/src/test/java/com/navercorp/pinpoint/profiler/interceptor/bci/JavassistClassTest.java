@@ -14,29 +14,10 @@
 
 package com.navercorp.pinpoint.profiler.interceptor.bci;
 
-import static org.junit.Assert.*;
-
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.security.ProtectionDomain;
-
 import com.navercorp.pinpoint.bootstrap.config.DefaultProfilerConfig;
-import javassist.bytecode.Descriptor;
-
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.navercorp.pinpoint.bootstrap.config.ProfilerConfig;
 import com.navercorp.pinpoint.bootstrap.context.DatabaseInfo;
-import com.navercorp.pinpoint.bootstrap.instrument.ClassFilters;
-import com.navercorp.pinpoint.bootstrap.instrument.InstrumentClass;
-import com.navercorp.pinpoint.bootstrap.instrument.InstrumentException;
-import com.navercorp.pinpoint.bootstrap.instrument.InstrumentMethod;
-import com.navercorp.pinpoint.bootstrap.instrument.Instrumentor;
+import com.navercorp.pinpoint.bootstrap.instrument.*;
 import com.navercorp.pinpoint.bootstrap.instrument.transformer.TransformCallback;
 import com.navercorp.pinpoint.bootstrap.interceptor.Interceptor;
 import com.navercorp.pinpoint.bootstrap.logging.PLoggerFactory;
@@ -48,6 +29,21 @@ import com.navercorp.pinpoint.profiler.interceptor.registry.GlobalInterceptorReg
 import com.navercorp.pinpoint.profiler.logging.Slf4jLoggerBinder;
 import com.navercorp.pinpoint.test.MockAgent;
 import com.navercorp.pinpoint.test.TestClassLoader;
+import javassist.bytecode.Descriptor;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.security.ProtectionDomain;
+import java.util.Properties;
+
+import static org.junit.Assert.assertEquals;
 
 /**
  * @author emeroad
@@ -55,13 +51,11 @@ import com.navercorp.pinpoint.test.TestClassLoader;
 public class JavassistClassTest {
   private Logger logger = LoggerFactory.getLogger(JavassistClassTest.class.getName());
 
-  @Before
-  public void clear() {
+  @Before public void clear() {
     TestInterceptors.clear();
   }
 
-  @Test
-  public void testClassHierarchy() throws InstrumentException {
+  @Test public void testClassHierarchy() throws InstrumentException {
     JavassistClassPool pool = new JavassistClassPool(new GlobalInterceptorRegistryBinder(), null);
 
     String testObjectName = "com.navercorp.pinpoint.profiler.interceptor.bci.TestObject";
@@ -89,8 +83,7 @@ public class JavassistClassTest {
     Assert.assertEquals(hierarchyInterfaces[1], "java.lang.Comparable");
   }
 
-  @Test
-  public void testDeclaredMethod() throws InstrumentException {
+  @Test public void testDeclaredMethod() throws InstrumentException {
 
     JavassistClassPool pool = new JavassistClassPool(new GlobalInterceptorRegistryBinder(), null);
 
@@ -105,8 +98,7 @@ public class JavassistClassTest {
 
   }
 
-  @Test
-  public void testDeclaredMethods() throws InstrumentException {
+  @Test public void testDeclaredMethods() throws InstrumentException {
 
     JavassistClassPool pool = new JavassistClassPool(new GlobalInterceptorRegistryBinder(), null);
 
@@ -128,15 +120,13 @@ public class JavassistClassTest {
     Assert.assertEquals(findMethodCount, 1);
   }
 
-  @Test
-  public void addTraceValue() throws Exception {
+  @Test public void addTraceValue() throws Exception {
     final TestClassLoader loader = getTestClassLoader();
     final String javassistClassName = TestObject.class.getName();
 
     loader.addTransformer(javassistClassName, new TransformCallback() {
 
-      @Override
-      public byte[] doInTransform(Instrumentor instrumentContext, ClassLoader loader,
+      @Override public byte[] doInTransform(Instrumentor instrumentContext, ClassLoader loader,
           String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
           byte[] classfileBuffer) throws InstrumentException {
         try {
@@ -194,22 +184,20 @@ public class JavassistClassTest {
     Assert.assertSame(UnKnownDatabaseInfo.INSTANCE, databaseInfo);
   }
 
-  @Test
-  public void testBeforeAddInterceptor() throws Exception {
+  @Test public void testBeforeAddInterceptor() throws Exception {
     final TestClassLoader loader = getTestClassLoader();
     final String javassistClassName = "com.navercorp.pinpoint.profiler.interceptor.bci.TestObject";
 
     loader.addTransformer(javassistClassName, new TransformCallback() {
 
-      @Override
-      public byte[] doInTransform(Instrumentor instrumentContext, ClassLoader classLoader,
+      @Override public byte[] doInTransform(Instrumentor instrumentContext, ClassLoader classLoader,
           String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
           byte[] classfileBuffer) throws InstrumentException {
         try {
           logger.info("modify className:{} cl:{}", className, classLoader);
 
-          InstrumentClass aClass = instrumentContext.getInstrumentClass(classLoader,
-              javassistClassName, classfileBuffer);
+          InstrumentClass aClass = instrumentContext
+              .getInstrumentClass(classLoader, javassistClassName, classfileBuffer);
 
           String methodName = "toString";
           aClass.getDeclaredMethod(methodName)
@@ -242,25 +230,23 @@ public class JavassistClassTest {
 
   }
 
-  @Test
-  public void testCodeAnalyse() throws Exception {
+  @Test public void testCodeAnalyse() throws Exception {
     final TestClassLoader loader = getTestClassLoader();
     final String javassistClassName = "com.navercorp.pinpoint.profiler.interceptor.bci.TestObject";
     loader.addTransformer(javassistClassName, new TransformCallback() {
 
-      @Override
-      public byte[] doInTransform(Instrumentor instrumentContext, ClassLoader classLoader,
+      @Override public byte[] doInTransform(Instrumentor instrumentContext, ClassLoader classLoader,
           String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
           byte[] classfileBuffer) throws InstrumentException {
         try {
           logger.info("modify className:{} cl:{}", className, classLoader);
 
-          InstrumentClass aClass = instrumentContext.getInstrumentClass(classLoader,
-              javassistClassName, classfileBuffer);
+          InstrumentClass aClass = instrumentContext
+              .getInstrumentClass(classLoader, javassistClassName, classfileBuffer);
 
           String methodName = "callA";
           aClass.getDeclaredMethod(methodName).addInterceptor(
-              "com.navercorp.pinpoint.plugin.user.interceptor.AutomationInterceptor");
+              "com.navercorp.pinpoint.bootstrap.plugin.automation.AutomationInterceptor");
 
           return aClass.toBytecode();
         } catch (InstrumentException e) {
@@ -278,10 +264,14 @@ public class JavassistClassTest {
     final Object testObject = testObjectClazz.newInstance();
     Method callA = testObjectClazz.getMethod(methodName);
     callA.invoke(testObject);
-    // Class<?> testObject2Class = loader.loadClass(TestObject2.class.getName());
-    // final Object testObject2 = testObject2Class.newInstance();
-    // Method callA2 = testObject2Class.getMethod(methodName);
-    // callA2.invoke(testObject2);
+    Class<?> testObject2Class = loader.loadClass(TestObject2.class.getName());
+    final Object testObject2 = testObject2Class.newInstance();
+    Method callA2 = testObject2Class.getMethod(methodName);
+    callA2.invoke(testObject2);
+  }
+
+  @Test public void testAddFaultInjector() throws Exception {
+    testCodeAnalyse();
   }
 
   private Interceptor getInterceptor(final TestClassLoader loader, int index)
@@ -293,10 +283,12 @@ public class JavassistClassTest {
     return interceptor;
   }
 
-  private TestClassLoader getTestClassLoader() {
+  private TestClassLoader getTestClassLoader() throws IOException {
     PLoggerFactory.initialize(new Slf4jLoggerBinder());
 
-    ProfilerConfig profilerConfig = new DefaultProfilerConfig();
+    Properties properties = new Properties();
+    properties.load(getClass().getClassLoader().getResourceAsStream("pinpoint.config"));
+    ProfilerConfig profilerConfig = new DefaultProfilerConfig(properties);
     profilerConfig.setApplicationServerType(ServiceType.TEST_STAND_ALONE.getName());
     DefaultAgent agent = MockAgent.of(profilerConfig);
 
@@ -317,16 +309,14 @@ public class JavassistClassTest {
     Assert.assertEquals(value, obj);
   }
 
-  @Test
-  public void testAddAfterInterceptor() throws Exception {
+  @Test public void testAddAfterInterceptor() throws Exception {
 
     final TestClassLoader loader = getTestClassLoader();
     final String testClassObject = "com.navercorp.pinpoint.profiler.interceptor.bci.TestObject2";
 
     loader.addTransformer(testClassObject, new TransformCallback() {
 
-      @Override
-      public byte[] doInTransform(Instrumentor instrumentContext, ClassLoader classLoader,
+      @Override public byte[] doInTransform(Instrumentor instrumentContext, ClassLoader classLoader,
           String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
           byte[] classfileBuffer) throws InstrumentException {
         try {
@@ -382,21 +372,18 @@ public class JavassistClassTest {
 
   }
 
-  @Test
-  public void nullDescriptor() {
+  @Test public void nullDescriptor() {
     String nullDescriptor = Descriptor.ofParameters(null);
     logger.info("Descript null:{}", nullDescriptor);
   }
 
-  @Test
-  public void testAddGetter() throws Exception {
+  @Test public void testAddGetter() throws Exception {
     final TestClassLoader loader = getTestClassLoader();
     final String targetClassName = "com.navercorp.pinpoint.profiler.interceptor.bci.TestObject3";
 
     loader.addTransformer(targetClassName, new TransformCallback() {
 
-      @Override
-      public byte[] doInTransform(Instrumentor instrumentContext, ClassLoader classLoader,
+      @Override public byte[] doInTransform(Instrumentor instrumentContext, ClassLoader classLoader,
           String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
           byte[] classfileBuffer) throws InstrumentException {
         try {
@@ -442,8 +429,7 @@ public class JavassistClassTest {
   }
 
 
-  @Test
-  public void getNestedClasses() throws Exception {
+  @Test public void getNestedClasses() throws Exception {
     JavassistClassPool pool = new JavassistClassPool(new GlobalInterceptorRegistryBinder(), null);
     String testObjectName = "com.navercorp.pinpoint.profiler.interceptor.bci.TestObjectNestedClass";
     InstrumentClass testObject = pool.getClass(null, testObjectName, null);
@@ -461,19 +447,17 @@ public class JavassistClassTest {
         testObject.getNestedClasses(ClassFilters.enclosingMethod("annonymousInnerClass")).size());
 
     // find interface condition.
-    assertEquals(2, testObject
-        .getNestedClasses(ClassFilters.interfaze("java.util.concurrent.Callable")).size());
+    assertEquals(2,
+        testObject.getNestedClasses(ClassFilters.interfaze("java.util.concurrent.Callable"))
+            .size());
 
     // find enclosing method & interface condition.
-    assertEquals(1,
-        testObject.getNestedClasses(
-            ClassFilters.chain(ClassFilters.enclosingMethod("annonymousInnerClass"),
-                ClassFilters.interfaze("java.util.concurrent.Callable")))
-            .size());
+    assertEquals(1, testObject.getNestedClasses(ClassFilters
+        .chain(ClassFilters.enclosingMethod("annonymousInnerClass"),
+            ClassFilters.interfaze("java.util.concurrent.Callable"))).size());
   }
 
-  @Test
-  public void hasEnclodingMethod() throws Exception {
+  @Test public void hasEnclodingMethod() throws Exception {
     JavassistClassPool pool = new JavassistClassPool(new GlobalInterceptorRegistryBinder(), null);
     String testObjectName = "com.navercorp.pinpoint.profiler.interceptor.bci.TestObjectNestedClass";
     InstrumentClass testObject = pool.getClass(null, testObjectName, null);

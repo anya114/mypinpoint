@@ -23,150 +23,152 @@ import java.util.List;
  * @author Woonduk Kang(emeroad)
  */
 public interface ProfilerConfig {
-    String getCollectorSpanServerIp();
+  String getCollectorSpanServerIp();
 
-    int getCollectorSpanServerPort();
+  int getCollectorSpanServerPort();
 
-    String getCollectorStatServerIp();
+  String getCollectorStatServerIp();
 
-    int getCollectorStatServerPort();
+  int getCollectorStatServerPort();
 
-    String getCollectorTcpServerIp();
+  String getCollectorTcpServerIp();
 
-    int getCollectorTcpServerPort();
+  int getCollectorTcpServerPort();
 
-    int getStatDataSenderWriteQueueSize();
+  int getStatDataSenderWriteQueueSize();
 
-    int getStatDataSenderSocketSendBufferSize();
+  int getStatDataSenderSocketSendBufferSize();
 
-    int getStatDataSenderSocketTimeout();
+  int getStatDataSenderSocketTimeout();
 
-    int getSpanDataSenderWriteQueueSize();
+  int getSpanDataSenderWriteQueueSize();
 
-    int getSpanDataSenderSocketSendBufferSize();
+  int getSpanDataSenderSocketSendBufferSize();
 
-    boolean isTcpDataSenderCommandAcceptEnable();
+  boolean isTcpDataSenderCommandAcceptEnable();
 
-    boolean isTraceAgentActiveThread();
+  boolean isTraceAgentActiveThread();
 
-    int getSpanDataSenderSocketTimeout();
+  int getSpanDataSenderSocketTimeout();
 
-    int getSpanDataSenderChunkSize();
+  int getSpanDataSenderChunkSize();
 
-    int getStatDataSenderChunkSize();
+  int getStatDataSenderChunkSize();
 
-    boolean isProfileEnable();
+  boolean isProfileEnable();
 
-    int getJdbcSqlCacheSize();
+  int getJdbcSqlCacheSize();
 
-    boolean isTraceSqlBindValue();
+  boolean isTraceSqlBindValue();
 
-    int getMaxSqlBindValueSize();
+  int getMaxSqlBindValueSize();
 
-    boolean isSamplingEnable();
+  boolean isSamplingEnable();
 
-    int getSamplingRate();
+  int getSamplingRate();
 
-    boolean isIoBufferingEnable();
+  boolean isIoBufferingEnable();
 
-    int getIoBufferingBufferSize();
+  int getIoBufferingBufferSize();
 
-    int getProfileJvmCollectInterval();
+  int getProfileJvmCollectInterval();
 
-    long getAgentInfoSendRetryInterval();
+  long getAgentInfoSendRetryInterval();
 
-    boolean isTomcatHidePinpointHeader();
+  boolean isTomcatHidePinpointHeader();
 
-    boolean isTomcatTraceRequestParam();
+  boolean isTomcatTraceRequestParam();
 
-    Filter<String> getTomcatExcludeUrlFilter();
+  Filter<String> getTomcatExcludeUrlFilter();
 
-    String getTomcatRealIpHeader();
+  String getTomcatRealIpHeader();
 
-    String getTomcatRealIpEmptyValue();
+  String getTomcatRealIpEmptyValue();
 
-    Filter<String> getTomcatExcludeProfileMethodFilter();
+  Filter<String> getTomcatExcludeProfileMethodFilter();
 
-    boolean isApacheHttpClient3Profile();
+  boolean isApacheHttpClient3Profile();
 
-    boolean isApacheHttpClient3ProfileCookie();
+  boolean isApacheHttpClient3ProfileCookie();
 
-    DumpType getApacheHttpClient3ProfileCookieDumpType();
+  DumpType getApacheHttpClient3ProfileCookieDumpType();
 
-    int getApacheHttpClient3ProfileCookieSamplingRate();
+  int getApacheHttpClient3ProfileCookieSamplingRate();
 
-    boolean isApacheHttpClient3ProfileEntity();
+  boolean isApacheHttpClient3ProfileEntity();
 
-    DumpType getApacheHttpClient3ProfileEntityDumpType();
+  DumpType getApacheHttpClient3ProfileEntityDumpType();
 
-    int getApacheHttpClient3ProfileEntitySamplingRate();
+  int getApacheHttpClient3ProfileEntitySamplingRate();
 
-    boolean isApacheHttpClient3ProfileIo();
+  boolean isApacheHttpClient3ProfileIo();
 
-    //-----------------------------------------
-    // http apache client 4
-    boolean isApacheHttpClient4Profile();
+  //-----------------------------------------
+  // http apache client 4
+  boolean isApacheHttpClient4Profile();
 
-    boolean isApacheHttpClient4ProfileCookie();
+  boolean isApacheHttpClient4ProfileCookie();
 
-    DumpType getApacheHttpClient4ProfileCookieDumpType();
+  DumpType getApacheHttpClient4ProfileCookieDumpType();
 
-    int getApacheHttpClient4ProfileCookieSamplingRate();
+  int getApacheHttpClient4ProfileCookieSamplingRate();
 
-    boolean isApacheHttpClient4ProfileEntity();
+  boolean isApacheHttpClient4ProfileEntity();
 
-    DumpType getApacheHttpClient4ProfileEntityDumpType();
+  DumpType getApacheHttpClient4ProfileEntityDumpType();
 
-    int getApacheHttpClient4ProfileEntitySamplingRate();
+  int getApacheHttpClient4ProfileEntitySamplingRate();
 
-    boolean isApacheHttpClient4ProfileStatusCode();
+  boolean isApacheHttpClient4ProfileStatusCode();
 
-    boolean isApacheHttpClient4ProfileIo();
+  boolean isApacheHttpClient4ProfileIo();
 
-    //-----------------------------------------
-    // org/apache/http/impl/nio/*
-    boolean getApacheNIOHttpClient4Profile();
+  //-----------------------------------------
+  // org/apache/http/impl/nio/*
+  boolean getApacheNIOHttpClient4Profile();
 
-    boolean isIBatisEnabled();
+  boolean isIBatisEnabled();
 
-    boolean isMyBatisEnabled();
+  boolean isMyBatisEnabled();
 
-    boolean isRedisEnabled();
+  boolean isRedisEnabled();
 
-    boolean isRedisPipelineEnabled();
+  boolean isRedisPipelineEnabled();
 
-    Filter<String> getProfilableClassFilter();
+  Filter<String> getProfilableClassFilter();
 
-    List<String> getApplicationTypeDetectOrder();
+  List<String> getApplicationTypeDetectOrder();
 
-    List<String> getDisabledPlugins();
+  List<String> getDisabledPlugins();
 
-    void setDisabledPlugins(List<String> disabledPlugins);
+  void setDisabledPlugins(List<String> disabledPlugins);
 
-    String getApplicationServerType();
+  String getApplicationServerType();
 
-    void setApplicationServerType(String applicationServerType);
+  void setApplicationServerType(String applicationServerType);
 
-    boolean isLog4jLoggingTransactionInfo();
+  boolean isLog4jLoggingTransactionInfo();
 
-    boolean isLogbackLoggingTransactionInfo();
+  boolean isLogbackLoggingTransactionInfo();
 
-    int getCallStackMaxDepth();
+  int getCallStackMaxDepth();
 
-    void setCallStackMaxDepth(int callStackMaxDepth);
+  void setCallStackMaxDepth(int callStackMaxDepth);
 
-    boolean isPropagateInterceptorException();
+  boolean isPropagateInterceptorException();
 
-    String readString(String propertyName, String defaultValue);
+  String readString(String propertyName, String defaultValue);
 
-    int readInt(String propertyName, int defaultValue);
+  int readInt(String propertyName, int defaultValue);
 
-    DumpType readDumpType(String propertyName, DumpType defaultDump);
+  DumpType readDumpType(String propertyName, DumpType defaultDump);
 
-    long readLong(String propertyName, long defaultValue);
+  long readLong(String propertyName, long defaultValue);
 
-    List<String> readList(String propertyName);
+  List<String> readList(String propertyName);
 
-    boolean readBoolean(String propertyName, boolean defaultValue);
+  boolean readBoolean(String propertyName, boolean defaultValue);
 
+  boolean faultInjectEnable();
+  List<String> getFaultInjectList();
 }

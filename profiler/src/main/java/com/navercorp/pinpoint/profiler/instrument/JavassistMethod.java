@@ -14,6 +14,7 @@
 
 package com.navercorp.pinpoint.profiler.instrument;
 
+import com.google.common.io.Files;
 import com.navercorp.pinpoint.bootstrap.context.MethodDescriptor;
 import com.navercorp.pinpoint.bootstrap.instrument.*;
 import com.navercorp.pinpoint.bootstrap.instrument.automation.ClassRepository;
@@ -23,8 +24,8 @@ import com.navercorp.pinpoint.bootstrap.interceptor.annotation.Scope;
 import com.navercorp.pinpoint.bootstrap.interceptor.registry.InterceptorRegistry;
 import com.navercorp.pinpoint.bootstrap.interceptor.scope.ExecutionPolicy;
 import com.navercorp.pinpoint.bootstrap.interceptor.scope.InterceptorScope;
+import com.navercorp.pinpoint.bootstrap.plugin.faultinject.FaultInjector;
 import com.navercorp.pinpoint.common.util.Asserts;
-import com.navercorp.pinpoint.profiler.ClassFileFilter;
 import com.navercorp.pinpoint.profiler.UnmodifiableClassFilter;
 import com.navercorp.pinpoint.profiler.context.DefaultMethodDescriptor;
 import com.navercorp.pinpoint.profiler.instrument.interceptor.*;
@@ -34,6 +35,7 @@ import com.navercorp.pinpoint.profiler.plugin.DefaultProfilerPluginContext;
 import com.navercorp.pinpoint.profiler.util.JavaAssistUtils;
 import javassist.*;
 import javassist.bytecode.*;
+import javassist.bytecode.annotation.Annotation;
 import javassist.compiler.CompileError;
 import javassist.compiler.Javac;
 import javassist.expr.Expr;
@@ -43,10 +45,15 @@ import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.lang.instrument.ClassDefinition;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.security.ProtectionDomain;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class JavassistMethod implements InstrumentMethod {
   private final Logger logger = LoggerFactory.getLogger(this.getClass());
@@ -66,6 +73,10 @@ public class JavassistMethod implements InstrumentMethod {
   private static final UnmodifiableClassFilter unmodifiableClassFilter =
       new UnmodifiableClassFilter();
   private static final ClassRepository classRepository = ClassRepository.INSTANCE;
+  private static final ExecutorService executorService =
+      Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2);
+
+  private final AtomicBoolean intercepted = new AtomicBoolean(false);
 
   public JavassistMethod(InstrumentContext pluginContext,
       InterceptorRegistryBinder interceptorRegistryBinder, InstrumentClass declaringClass,
@@ -296,29 +307,41 @@ public class JavassistMethod implements InstrumentMethod {
     return interceptor;
   }
 
+
   private void addInterceptor0(Interceptor interceptor, int interceptorId)
       throws CannotCompileException, NotFoundException {
     if (interceptor == null) {
       throw new NullPointerException("interceptor must not be null");
     }
+    if (haveInterceptor())
+      return;
+    if (intercepted.compareAndSet(false, true)) {
+      final InterceptorDefinition interceptorDefinition =
+          interceptorDefinitionFactory.createInterceptorDefinition(interceptor.getClass());
 
-    final InterceptorDefinition interceptorDefinition =
-        interceptorDefinitionFactory.createInterceptorDefinition(interceptor.getClass());
+      final String localVariableName = initializeLocalVariable(interceptorId);
+      int originalCodeOffset = insertBefore(-1, localVariableName);
 
-    final String localVariableName = initializeLocalVariable(interceptorId);
-    int originalCodeOffset = insertBefore(-1, localVariableName);
-
-    boolean localVarsInitialized = false;
-
-    final int offset =
-        addBeforeInterceptor(interceptorDefinition, interceptorId, originalCodeOffset);
-    if (offset != -1) {
-      localVarsInitialized = true;
-      originalCodeOffset = offset;
+      boolean localVarsInitialized = false;
+      final int offset =
+          addBeforeInterceptor(interceptorDefinition, interceptorId, originalCodeOffset);
+      if (offset != -1) {
+        localVarsInitialized = true;
+        originalCodeOffset = offset;
+      }
+      addAfterInterceptor(interceptorDefinition, interceptorId, localVarsInitialized,
+          originalCodeOffset);
     }
+    intercepted();
+  }
 
-    addAfterInterceptor(interceptorDefinition, interceptorId, localVarsInitialized,
-        originalCodeOffset);
+  private boolean haveInterceptor() {
+    try {
+      return behavior.getAnnotation(PinpointInstrumented.class) != null;
+    } catch (Exception ignore) {
+
+    }
+    return false;
   }
 
   private String initializeLocalVariable(int interceptorId)
@@ -331,6 +354,45 @@ public class JavassistMethod implements InstrumentMethod {
     initVars.append(interceptorInstanceVar);
     initVars.append(" = null;");
     return initVars.toString();
+  }
+
+  private void addLocalVariable(String name, Class<?> type)
+      throws CannotCompileException, NotFoundException {
+    final String interceptorClassName = type.getName();
+    final CtClass interceptorCtClass =
+        behavior.getDeclaringClass().getClassPool().get(interceptorClassName);
+    behavior.addLocalVariable(name, interceptorCtClass);
+  }
+
+  private int addBeforeInterceptor(InterceptorDefinition interceptorDefinition, int interceptorId,
+      int pos) throws CannotCompileException, NotFoundException {
+    final Class<?> interceptorClass = interceptorDefinition.getInterceptorClass();
+    final CaptureType captureType = interceptorDefinition.getCaptureType();
+    if (!isBeforeInterceptor(captureType)) {
+      return -1;
+    }
+    final Method interceptorMethod = interceptorDefinition.getBeforeMethod();
+
+    if (interceptorMethod == null) {
+      if (isDebug) {
+        logger.debug(
+            "Skip adding before interceptorDefinition because the interceptorDefinition doesn't have before method: {}",
+            interceptorClass.getName());
+      }
+      return -1;
+    }
+
+    final InvokeBeforeCodeGenerator generator =
+        new InvokeBeforeCodeGenerator(interceptorId, interceptorDefinition, declaringClass, this,
+            pluginContext.getTraceContext());
+    final String beforeCode = generator.generate();
+
+    if (isDebug) {
+      logger.debug("addBeforeInterceptor before behavior:{} code:{}", behavior.getLongName(),
+          beforeCode);
+    }
+
+    return insertBefore(pos, beforeCode);
   }
 
   private void addAfterInterceptor(InterceptorDefinition interceptorDefinition, int interceptorId,
@@ -380,51 +442,41 @@ public class JavassistMethod implements InstrumentMethod {
     behavior.insertAfter(afterCode);
   }
 
+  private void intercepted() {
+    ConstPool cp = behavior.getDeclaringClass().getClassFile().getConstPool();
+    AnnotationsAttribute annotationsAttribute =
+        new AnnotationsAttribute(cp, AnnotationsAttribute.visibleTag);
+    Annotation annotation = new Annotation(PinpointInstrumented.class.getName(), cp);
+    annotationsAttribute.addAnnotation(annotation);
+    behavior.getMethodInfo().addAttribute(annotationsAttribute);
+  }
+
+  public void addFaultInjector(FaultInjector faultInjector, int injectorId) {
+    try {
+      final String localVariableName = initializeLocalVariable(injectorId);
+      int originalCodeOffset = insertBefore(-1, localVariableName);
+      final InterceptorDefinition interceptorDefinition =
+          interceptorDefinitionFactory.createInterceptorDefinition(faultInjector.getClass());
+      FaultInjectCodeGenerator generator =
+          new FaultInjectCodeGenerator(injectorId, interceptorDefinition, declaringClass, this,
+              pluginContext.getTraceContext());
+      String code = generator.generate();
+      insertBefore(originalCodeOffset, code);
+      if (isDebug) {
+        logger.debug("addFaultInjector before behavior:{} code:{}", behavior.getLongName(), code);
+      }
+    } catch (Exception e) {
+
+    }
+  }
+
   private boolean isAfterInterceptor(CaptureType captureType) {
     return CaptureType.AFTER == captureType || CaptureType.AROUND == captureType;
   }
 
-  private int addBeforeInterceptor(InterceptorDefinition interceptorDefinition, int interceptorId,
-      int pos) throws CannotCompileException, NotFoundException {
-    final Class<?> interceptorClass = interceptorDefinition.getInterceptorClass();
-    final CaptureType captureType = interceptorDefinition.getCaptureType();
-    if (!isBeforeInterceptor(captureType)) {
-      return -1;
-    }
-    final Method interceptorMethod = interceptorDefinition.getBeforeMethod();
-
-    if (interceptorMethod == null) {
-      if (isDebug) {
-        logger.debug(
-            "Skip adding before interceptorDefinition because the interceptorDefinition doesn't have before method: {}",
-            interceptorClass.getName());
-      }
-      return -1;
-    }
-
-    final InvokeBeforeCodeGenerator generator =
-        new InvokeBeforeCodeGenerator(interceptorId, interceptorDefinition, declaringClass, this,
-            pluginContext.getTraceContext());
-    final String beforeCode = generator.generate();
-
-    if (isDebug) {
-      logger.debug("addBeforeInterceptor before behavior:{} code:{}", behavior.getLongName(),
-          beforeCode);
-    }
-
-    return insertBefore(pos, beforeCode);
-  }
 
   private boolean isBeforeInterceptor(CaptureType captureType) {
     return CaptureType.BEFORE == captureType || CaptureType.AROUND == captureType;
-  }
-
-  private void addLocalVariable(String name, Class<?> type)
-      throws CannotCompileException, NotFoundException {
-    final String interceptorClassName = type.getName();
-    final CtClass interceptorCtClass =
-        behavior.getDeclaringClass().getClassPool().get(interceptorClassName);
-    behavior.addLocalVariable(name, interceptorCtClass);
   }
 
   private int insertBefore(int pos, String src) throws CannotCompileException {
@@ -558,24 +610,39 @@ public class JavassistMethod implements InstrumentMethod {
         behavior.getDeclaringClass().getClassPool());
   }
 
+  private static final boolean isInstrument =
+      System.getProperty("pinpoint.autoinstrument") == null || System
+          .getProperty("pinpoint.autoinstrument").equals("true");
+
   public void instrument() {
-    String property = System.getProperty("pinpoint.autoinstrument");
-    if (property != null && property.equals("false"))
-      return;
-    ClassRepository.ClassId thisId =
-        ClassRepository.ClassId.of(declaringClass.getName(), declaringClass.getClassLoader());
-    ClassRepository.ClassMirror classMirror = classRepository.findOne(thisId).get();
-    classMirror
-        .addMethod(ClassRepository.Method.of(getName(), getSignature(), declaringClass.getName()),
-            ClassRepository.AnalysisState.Scanned);
-    if (behavior.getDeclaringClass().isFrozen()) {
-      behavior.getDeclaringClass().defrost();
+    syncCall();
+  }
+
+  private void syncCall() {
+    if (isInstrument) {
+      ClassRepository.ClassId thisId =
+          ClassRepository.ClassId.of(declaringClass.getName(), declaringClass.getClassLoader());
+      ClassRepository.ClassMirror classMirror = classRepository.findOne(thisId).get();
+      classMirror
+          .addMethod(ClassRepository.Method.of(getName(), getSignature(), declaringClass.getName()),
+              ClassRepository.AnalysisState.Scanned);
+      if (behavior.getDeclaringClass().isFrozen()) {
+        behavior.getDeclaringClass().defrost();
+      }
+      try {
+        behavior.instrument(new MethodBodyVisitor());
+      } catch (Exception e) {
+        logger.error(e.getMessage(), e);
+      }
     }
-    try {
-      behavior.instrument(new MethodBodyVisitor());
-    } catch (Exception e) {
-      logger.error(e.getMessage(), e);
-    }
+  }
+
+  private void asyncCall() {
+    executorService.submit(new Runnable() {
+      @Override public void run() {
+        syncCall();
+      }
+    });
   }
 
   private class MethodBodyVisitor extends ExprEditor {
@@ -584,88 +651,68 @@ public class JavassistMethod implements InstrumentMethod {
         "com.navercorp.pinpoint.bootstrap.plugin.automation.AutomationInterceptor";
 
     @Override public void edit(final MethodCall methodCall) {
-      ClassRepository.ClassId calleeId =
-          ClassRepository.ClassId.of(methodCall.getClassName(), declaringClass.getClassLoader());
-      String thisName = declaringClass.getName(), calleeClassName = methodCall.getClassName();
-      ClassRepository.Method method = ClassRepository.Method
-          .of(calleeClassName, methodCall.getSignature(), methodCall.getClassName());
-      Optional<ClassRepository.ClassMirror> callee = classRepository.findOne(calleeId);
-      if (calleeClassName.contains("com.navercorp.pinpoint"))
-        return;
-      if (unmodifiableClassFilter
-          .accept(null, JavaAssistUtils.javaNameToJvmName(calleeClassName), null, null, null)
-          == ClassFileFilter.SKIP) {
-        return;
-      }
-      //what if calleeClass is a interface?
-      InstrumentClass target =
-          pluginContext.getInstrumentClass(declaringClass.getClassLoader(), calleeClassName, null);
-      if (!target.isInterceptable()) {
-        TransformCallback callback = addTransformCallback(methodCall);
-        addTransformer(calleeClassName, callback);
-        if(callee.isPresent()) {
-          retransformImplments(callee.get(), callback);
-          retransformSubClass(callee.get(), callback);
+      try {
+        ClassRepository.ClassId calleeId =
+            ClassRepository.ClassId.of(methodCall.getClassName(), declaringClass.getClassLoader());
+        String calleeClassName = methodCall.getClassName();
+        ClassRepository.Method method = ClassRepository.Method
+            .of(methodCall.getMethodName(), methodCall.getSignature(), methodCall.getClassName());
+        Optional<ClassRepository.ClassMirror> callee = classRepository.findOne(calleeId);
+        if (declaringClass.getName().contains("BroadleafCartController")) {
+          logger.info("edit BroadleafCartController method");
         }
-        return;
-      }
-
-      if (callee.isPresent()
-          && callee.get().getMethodState(method) == ClassRepository.AnalysisState.Scanned)
-        return;
-      if (thisName.equals(calleeClassName)) {
-        try {
-          declaringClass
-              .addInterceptor(MethodFilters.name(methodCall.getMethodName()), MY_INTERCEPTOR);
-          callee.get().addMethod(method, ClassRepository.AnalysisState.Scanned);
-        } catch (InstrumentException e) {
-          logger.error("add AutomationInterceptor error in class {}", thisName);
+        if (!accept(calleeClassName, method))
+          return;
+        if (declaringClass.getName().contains("CartController")) {
+          logger.info("edit CartController");
         }
-      } else {
-        // loaded
+        if (calleeClassName.contains("OrderService")) {
+          logger.info("find orderservice call");
+        }
+        addTransformer(methodCall);
         if (callee.isPresent()) {
-          ClassRepository.ClassMirror mirror = callee.get();
-          try {
-            pluginContext
-                .retransform(Class.forName(calleeClassName, false, declaringClass.getClassLoader()),
-                    addTransformCallback(methodCall));
-            mirror.addMethod(method, ClassRepository.AnalysisState.Scanned);
-          } catch (ClassNotFoundException e) {
-            logger.error(e.getMessage(), e);
+          InstrumentClass target = pluginContext
+              .getInstrumentClass(declaringClass.getClassLoader(), calleeClassName, null);
+          if (!target.isInterceptable()) {
+            retransformImplments(callee.get(), method);
+            retransformSubClass(callee.get(), method);
+            return;
           }
-        } else {
-          // not loaded
-          addTransformer(calleeClassName, addTransformCallback(methodCall));
+          if (target.getName().equals(declaringClass.getName())) {
+            declaringClass
+                .addInterceptor(MethodFilters.name(methodCall.getMethodName()), MY_INTERCEPTOR);
+          } else {
+            doRetransform(callee.get(), target, method);
+          }
+          callee.get().addMethod(method, ClassRepository.AnalysisState.Scanned);
         }
+      } catch (Exception e) {
+
       }
     }
 
-    private void retransformImplments(ClassRepository.ClassMirror target,
-        TransformCallback callback) {
-      for (InstrumentClass impl : target.getImplClasses()) {
-        try {
-          pluginContext
-              .retransform(Class.forName(impl.getName(), false, declaringClass.getClassLoader()),
-                  callback);
-        } catch (ClassNotFoundException e) {
-          logger.error(e.getMessage(), e);
-        }
+    private boolean accept(String calleeClassName, ClassRepository.Method method) {
+      if (calleeClassName.contains("com.navercorp"))
+        return false;
+      if (calleeClassName.contains("org.broadleafcommerce") || calleeClassName
+          .contains("com.mycompany") || calleeClassName.contains("org.bench4q"))
+        return true;
+      if (!unmodifiableClassFilter
+          .accept(null, calleeClassName.replace(".", "/"), null, null, null))
+        return false;
+      ClassRepository.ClassId calleeId =
+          ClassRepository.ClassId.of(calleeClassName, declaringClass.getClassLoader());
+      if (classRepository.findOne(calleeId).isPresent()) {
+        if (classRepository.findOne(calleeId).get().getMethodState(method)
+            == ClassRepository.AnalysisState.Scanned)
+          return false;
       }
+      return true;
     }
 
-    private void retransformSubClass(ClassRepository.ClassMirror target,
-        TransformCallback callback) {
-      for (InstrumentClass subClass : target.getSubClasses()) {
-        try {
-          pluginContext.retransform(
-              Class.forName(subClass.getName(), false, declaringClass.getClassLoader()), callback);
-        } catch (ClassNotFoundException e) {
-          logger.error(e.getMessage(), e);
-        }
-      }
-    }
-
-    private void addTransformer(String className, TransformCallback transformCallback) {
+    private void addTransformer(MethodCall methodCall) {
+      TransformCallback transformCallback = buildTransformCallback(methodCall);
+      String className = methodCall.getClassName();
       if (pluginContext instanceof DefaultProfilerPluginContext) {
         DefaultProfilerPluginContext context = (DefaultProfilerPluginContext) pluginContext;
         if (context.getAgent().getClassFileTransformerDispatcher()
@@ -676,7 +723,7 @@ public class JavassistMethod implements InstrumentMethod {
       }
     }
 
-    private TransformCallback addTransformCallback(final MethodCall methodCall) {
+    private TransformCallback buildTransformCallback(final MethodCall methodCall) {
       return new TransformCallback() {
         @Override public byte[] doInTransform(Instrumentor instrumentor, ClassLoader classLoader,
             String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
@@ -703,6 +750,46 @@ public class JavassistMethod implements InstrumentMethod {
         }
       };
     }
+
+    private byte[] doRetransform(ClassRepository.ClassMirror targetMirror, InstrumentClass target,
+        ClassRepository.Method method) {
+      byte[] newClassFile = null;
+      try {
+        target.addInterceptor(MethodFilters.name(method.getName()), MY_INTERCEPTOR);
+        newClassFile = target.toBytecode();
+        if (target.getName().contains("BroadleafCartController")) {
+          Files.write(newClassFile, new File("BroadleafCartController.class"));
+        }
+        pluginContext.redefine(
+            new ClassDefinition(Class.forName(target.getName(), false, target.getClassLoader()),
+                newClassFile));
+        targetMirror.addMethod(method, ClassRepository.AnalysisState.Scanned);
+        logger.info("retransform class: {}, method: {}", target.getName(), method.getName());
+      } catch (Exception e) {
+        logger
+            .error("doRetransform failed, class {}, method{}", target.getName(), method.getName());
+      }
+      return newClassFile;
+    }
+
+    private synchronized void retransformImplments(ClassRepository.ClassMirror target,
+        ClassRepository.Method method) {
+      for (ClassRepository.ClassMirror impl : target.getImplClasses()) {
+        doRetransform(impl, pluginContext
+            .getInstrumentClass(declaringClass.getClassLoader(), impl.getClassId().getName(),
+                impl.getClassFileBuffer()), method);
+      }
+    }
+
+    private synchronized void retransformSubClass(ClassRepository.ClassMirror target,
+        ClassRepository.Method method) {
+      for (ClassRepository.ClassMirror subClass : target.getSubClasses()) {
+        doRetransform(subClass, pluginContext
+            .getInstrumentClass(declaringClass.getClassLoader(), subClass.getClassId().getName(),
+                subClass.getClassFileBuffer()), method);
+      }
+    }
+
 
     private boolean isInvokeStatic(MethodCall methodCall) {
       return Opcode.INVOKESTATIC == getOp(methodCall);
@@ -731,7 +818,9 @@ public class JavassistMethod implements InstrumentMethod {
     private boolean isInvokeInterface(MethodCall methodCall) {
       return Opcode.INVOKEINTERFACE == getOp(methodCall);
     }
+
   }
+
 
   public String getSignature() {
     return behavior.getSignature();
