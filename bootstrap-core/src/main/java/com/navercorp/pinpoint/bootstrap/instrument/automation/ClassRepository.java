@@ -67,7 +67,6 @@ public enum ClassRepository
     /**
      * keep track with the current defined class
      */
-    @Getter @Setter private byte[] classFileBuffer;
 
     public ClassMirror(ClassId classId) {
       methodStates = new HashMap<Method, AnalysisState>();

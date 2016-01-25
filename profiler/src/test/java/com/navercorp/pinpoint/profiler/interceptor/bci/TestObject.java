@@ -41,6 +41,7 @@ public class TestObject {
   }
 
   public int callA() {
+
     logger.info("callA");
     int i = callA++;
     if (isthrow) {
@@ -50,11 +51,8 @@ public class TestObject {
     internalMethod();
     TestObject2 testObject2 = new TestObject2();
     testObject2.callA();
-    if (returnCode == 1) {
-      return 1;
-    }
-    if (returnCode == 10) {
-      return -1;
+    if(true) {
+      throw new RuntimeException("callA exception");
     }
     return 0;
   }

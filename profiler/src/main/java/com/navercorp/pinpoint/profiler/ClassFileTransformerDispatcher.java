@@ -83,17 +83,14 @@ public class ClassFileTransformerDispatcher
   @Override public byte[] transform(ClassLoader classLoader, String jvmClassName,
       Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classFileBuffer)
       throws IllegalClassFormatException {
-    if (jvmClassName.contains("BroadleafSearchController")) {
-      logger.info("transform BroadleafSearchController");
-    }
-    if (jvmClassName.contains("OrderService")) {
-      logger.info("transform OrderService class: {}", jvmClassName);
-    }
     if (jvmClassName.contains("OrderServiceImpl")) {
       logger.info("transform OrderServiceImpl class: {}", jvmClassName);
     }
     if (jvmClassName.contains("LegacyOrderService")) {
       logger.info("transform LegacyOrderService class: {}", jvmClassName);
+    }
+    if(jvmClassName.contains("SolrSearchServiceImpl")){
+      logger.info("transform inject {}", jvmClassName);
     }
     if (!pinpointClassFilter
         .accept(classLoader, jvmClassName, classBeingRedefined, protectionDomain,
@@ -214,7 +211,6 @@ public class ClassFileTransformerDispatcher
       ClassRepository.ClassMirror classMirror = new ClassRepository.ClassMirror(classId);
       classRepository.add(classId, classMirror);
     }
-    classRepository.findOne(classId).get().setClassFileBuffer(classFileBuffer);
   }
 
   @Override

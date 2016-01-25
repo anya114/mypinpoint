@@ -1,4 +1,4 @@
-package com.navercorp.pinpoint.bootstrap.plugin.faultinject;
+package com.navercorp.pinpoint.bootstrap.faultinject;
 
 import com.navercorp.pinpoint.bootstrap.interceptor.AroundInterceptor;
 

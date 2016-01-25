@@ -124,9 +124,7 @@ public class JavassistClassPool implements InstrumentClassPool {
     try {
       CtClass ctClass = classPool.get(className);
       ClassRepository.ClassId classId = ClassRepository.ClassId.of(className, classLoader);
-      if (!classRepository.findOne(classId).isPresent()) {
-        classRepository.add(classId, new ClassRepository.ClassMirror(classId));
-      }
+      classRepository.add(classId, new ClassRepository.ClassMirror(classId));
       return ctClass;
     } catch (NotFoundException e) {
       throw new NotFoundInstrumentException(className + " class not found. Cause:" + e.getMessage(),

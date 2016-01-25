@@ -1,11 +1,9 @@
 package com.navercorp.pinpoint.profiler.plugin;
 
+import com.google.common.io.Files;
 import com.navercorp.pinpoint.bootstrap.config.DefaultProfilerConfig;
 import com.navercorp.pinpoint.bootstrap.config.ProfilerConfig;
-import com.navercorp.pinpoint.bootstrap.context.Trace;
-import com.navercorp.pinpoint.bootstrap.instrument.InstrumentClass;
-import com.navercorp.pinpoint.bootstrap.instrument.InstrumentException;
-import com.navercorp.pinpoint.bootstrap.instrument.Instrumentor;
+import com.navercorp.pinpoint.bootstrap.instrument.*;
 import com.navercorp.pinpoint.bootstrap.instrument.transformer.TransformCallback;
 import com.navercorp.pinpoint.bootstrap.interceptor.registry.InterceptorRegistry;
 import com.navercorp.pinpoint.bootstrap.logging.PLoggerFactory;
@@ -14,6 +12,7 @@ import com.navercorp.pinpoint.common.trace.ServiceType;
 import com.navercorp.pinpoint.profiler.DefaultAgent;
 import com.navercorp.pinpoint.profiler.context.DefaultTrace;
 import com.navercorp.pinpoint.profiler.context.storage.Storage;
+import com.navercorp.pinpoint.profiler.interceptor.bci.TestObject;
 import com.navercorp.pinpoint.profiler.logging.Slf4jLoggerBinder;
 import com.navercorp.pinpoint.test.MockAgent;
 import com.navercorp.pinpoint.test.TestClassLoader;
@@ -23,6 +22,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -103,7 +103,8 @@ public class AutomationInterceptorTest {
     }
     assertNotNull(interceptor);
     assertEquals(false, interceptor.isOn());
-    System.out.println(getStorage((DefaultTrace) interceptor.getTraceContext().currentTraceObject()));
+    System.out
+        .println(getStorage((DefaultTrace) interceptor.getTraceContext().currentTraceObject()));
   }
 
   private Storage getStorage(DefaultTrace trace) {
@@ -115,6 +116,36 @@ public class AutomationInterceptorTest {
 
     }
     return null;
+  }
+
+  @Test public void testWithException() throws Exception {
+    TestClassLoader loader = getTestClassLoader();
+    final String testClassName = TestObject.class.getName();
+    final String methodName = "callA";
+    loader.addTransformer(testClassName, new TransformCallback() {
+      @Override public byte[] doInTransform(Instrumentor instrumentor, ClassLoader classLoader,
+          String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
+          byte[] classfileBuffer) throws InstrumentException {
+        logger.info("modify className:{} cl:{}", className, classLoader);
+        InstrumentClass target =
+            instrumentor.getInstrumentClass(classLoader, testClassName, classfileBuffer);
+        for (InstrumentMethod method : target.getDeclaredMethods(MethodFilters.name(methodName))) {
+          method.addInterceptor(AutomationInterceptor.class.getName());
+        }
+        byte[] newClassFile = target.toBytecode();
+        try {
+          Files.write(newClassFile, new File("TestObject.class"));
+        } catch (IOException e) {
+        }
+        return newClassFile;
+      }
+    });
+    loader.initialize();
+    Class<?> testObjectClass = loader.loadClass(testClassName);
+    loader.loadClass(testClassName);
+    loader.loadClass(testClassName);
+    Method method = testObjectClass.getMethod(methodName);
+    method.invoke(testObjectClass.newInstance());
   }
 
   /**

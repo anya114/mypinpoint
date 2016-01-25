@@ -1,6 +1,7 @@
-package com.navercorp.pinpoint.bootstrap.plugin.faultinject;
+package com.navercorp.pinpoint.profiler.faultinject;
 
 import com.navercorp.pinpoint.bootstrap.config.ProfilerConfig;
+import com.navercorp.pinpoint.bootstrap.faultinject.FaultInjector;
 import com.navercorp.pinpoint.bootstrap.instrument.InstrumentClass;
 import com.navercorp.pinpoint.bootstrap.instrument.InstrumentClassPool;
 import com.navercorp.pinpoint.bootstrap.instrument.InstrumentContext;
@@ -40,6 +41,9 @@ public class FaultInjectClassFileTransformer implements ClassFileTransformer {
 
   private void initFaultMap(ProfilerConfig config) {
     for (String fault : config.getFaultInjectList()) {
+      if(fault.isEmpty()) {
+        continue;
+      }
       String className = toClassName(fault);
       String methodName = toMethodName(fault);
       String faultTypeName = toFaultType(fault);
@@ -97,11 +101,14 @@ public class FaultInjectClassFileTransformer implements ClassFileTransformer {
     if (!faultMap.containsKey(classInternalName))
       return null;
     try {
+      if(jvmClassName.contains("SolrSearchServiceImpl")){
+        logger.info("fault inject transform {}", jvmClassName);
+      }
       InstrumentClass instrumentClass = instrumentClassPool
           .getClass(instrumentContext, loader, classInternalName, classfileBuffer);
       for (MethodFaultPair pair : faultMap.get(classInternalName)) {
         instrumentClass.addFaultInjector(MethodFilters.name(pair.methodName),
-            new FaultInjector(pair.faultType));
+           new FaultInjector(pair.faultType));
       }
       ret = instrumentClass.toBytecode();
     } catch (Exception e) {

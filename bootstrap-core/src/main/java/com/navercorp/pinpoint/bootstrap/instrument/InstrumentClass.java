@@ -16,9 +16,9 @@
 
 package com.navercorp.pinpoint.bootstrap.instrument;
 
+import com.navercorp.pinpoint.bootstrap.faultinject.FaultInjector;
 import com.navercorp.pinpoint.bootstrap.interceptor.scope.ExecutionPolicy;
 import com.navercorp.pinpoint.bootstrap.interceptor.scope.InterceptorScope;
-import com.navercorp.pinpoint.bootstrap.plugin.faultinject.FaultInjector;
 
 import java.util.List;
 

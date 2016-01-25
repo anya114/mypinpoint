@@ -42,6 +42,7 @@ public class AutomationInterceptor implements AroundInterceptor {
   }
 
   @Override public void before(Object target, Object[] args) {
+
     if (isDebug) {
       logger.beforeInterceptor(target, args);
     }

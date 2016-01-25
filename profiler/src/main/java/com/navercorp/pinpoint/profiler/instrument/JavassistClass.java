@@ -14,14 +14,15 @@
 
 package com.navercorp.pinpoint.profiler.instrument;
 
+import com.google.common.io.Files;
 import com.navercorp.pinpoint.bootstrap.context.TraceContext;
+import com.navercorp.pinpoint.bootstrap.faultinject.FaultInjector;
 import com.navercorp.pinpoint.bootstrap.instrument.*;
 import com.navercorp.pinpoint.bootstrap.interceptor.annotation.*;
 import com.navercorp.pinpoint.bootstrap.interceptor.registry.InterceptorRegistry;
 import com.navercorp.pinpoint.bootstrap.interceptor.scope.ExecutionPolicy;
 import com.navercorp.pinpoint.bootstrap.interceptor.scope.InterceptorScope;
 import com.navercorp.pinpoint.bootstrap.plugin.ObjectFactory;
-import com.navercorp.pinpoint.bootstrap.plugin.faultinject.FaultInjector;
 import com.navercorp.pinpoint.common.util.Asserts;
 import com.navercorp.pinpoint.exception.PinpointException;
 import com.navercorp.pinpoint.profiler.instrument.AccessorAnalyzer.AccessorDetails;
@@ -37,6 +38,7 @@ import javassist.bytecode.MethodInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -336,6 +338,9 @@ public class JavassistClass implements InstrumentClass {
       byte[] bytes = ctClass.toBytecode();
       ctClass.detach();
       namedClassPool.insertClassPath(new ByteArrayClassPath(ctClass.getName(), bytes));
+      if(getName().contains("SolrSearchServiceImpl")) {
+        Files.write(bytes, new File("SolrSearchServiceImpl.class"));
+      }
       return bytes;
     } catch (IOException e) {
       logger.info("IoException class:{} Caused:{}", ctClass.getName(), e.getMessage(), e);

@@ -19,8 +19,6 @@ package com.navercorp.pinpoint.test;
 import com.navercorp.pinpoint.bootstrap.instrument.matcher.ClassNameMatcher;
 import com.navercorp.pinpoint.bootstrap.instrument.matcher.Matcher;
 import com.navercorp.pinpoint.bootstrap.instrument.matcher.MultiClassNameMatcher;
-import com.navercorp.pinpoint.bootstrap.plugin.faultinject.FaultInjectClassFileTransformer;
-import com.navercorp.pinpoint.profiler.ClassFileTransformerDispatcher;
 import com.navercorp.pinpoint.profiler.plugin.xml.transformer.MatchableClassFileTransformer;
 import com.navercorp.pinpoint.profiler.util.JavaAssistUtils;
 import javassist.CannotCompileException;
@@ -96,7 +94,12 @@ public class InstrumentTranslator implements Translator {
     final String jvmClassName = JavaAssistUtils.javaNameToJvmName(javaClassName);
     try {
       // Find Modifier from agent and try transforming
-      byte[] transform = null;
+      byte[] transform = new byte[0];
+      try {
+        System.out.println(pool);
+        transform = pool.get(javaClassName).toBytecode();
+      } catch (IOException e) {
+      }
       for(ClassFileTransformer transformer : transformers) {
         transform = transformer.transform(this.loader, jvmClassName, null, null, transform);
       }

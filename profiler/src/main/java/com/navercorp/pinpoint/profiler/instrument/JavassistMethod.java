@@ -16,6 +16,7 @@ package com.navercorp.pinpoint.profiler.instrument;
 
 import com.google.common.io.Files;
 import com.navercorp.pinpoint.bootstrap.context.MethodDescriptor;
+import com.navercorp.pinpoint.bootstrap.faultinject.FaultInjector;
 import com.navercorp.pinpoint.bootstrap.instrument.*;
 import com.navercorp.pinpoint.bootstrap.instrument.automation.ClassRepository;
 import com.navercorp.pinpoint.bootstrap.instrument.transformer.TransformCallback;
@@ -24,7 +25,6 @@ import com.navercorp.pinpoint.bootstrap.interceptor.annotation.Scope;
 import com.navercorp.pinpoint.bootstrap.interceptor.registry.InterceptorRegistry;
 import com.navercorp.pinpoint.bootstrap.interceptor.scope.ExecutionPolicy;
 import com.navercorp.pinpoint.bootstrap.interceptor.scope.InterceptorScope;
-import com.navercorp.pinpoint.bootstrap.plugin.faultinject.FaultInjector;
 import com.navercorp.pinpoint.common.util.Asserts;
 import com.navercorp.pinpoint.profiler.UnmodifiableClassFilter;
 import com.navercorp.pinpoint.profiler.context.DefaultMethodDescriptor;
@@ -313,8 +313,12 @@ public class JavassistMethod implements InstrumentMethod {
     if (interceptor == null) {
       throw new NullPointerException("interceptor must not be null");
     }
-    if (haveInterceptor())
+    if (haveInterceptor()) {
       return;
+    }
+    if (declaringClass.getName().contains("SolrSearchServiceImpl")) {
+      logger.info("SolrSearchServiceImpl add interceptor. method: {}", behavior.getName());
+    }
     if (intercepted.compareAndSet(false, true)) {
       final InterceptorDefinition interceptorDefinition =
           interceptorDefinitionFactory.createInterceptorDefinition(interceptor.getClass());
@@ -444,14 +448,24 @@ public class JavassistMethod implements InstrumentMethod {
 
   private void intercepted() {
     ConstPool cp = behavior.getDeclaringClass().getClassFile().getConstPool();
-    AnnotationsAttribute annotationsAttribute =
-        new AnnotationsAttribute(cp, AnnotationsAttribute.visibleTag);
+    AnnotationsAttribute annotationsAttribute = (AnnotationsAttribute) behavior.getMethodInfo()
+        .getAttribute(AnnotationsAttribute.visibleTag);
+    if (annotationsAttribute == null) {
+      annotationsAttribute = new AnnotationsAttribute(cp, AnnotationsAttribute.visibleTag);
+    }
     Annotation annotation = new Annotation(PinpointInstrumented.class.getName(), cp);
     annotationsAttribute.addAnnotation(annotation);
     behavior.getMethodInfo().addAttribute(annotationsAttribute);
   }
 
   public void addFaultInjector(FaultInjector faultInjector, int injectorId) {
+    if (declaringClass.getName().contains("SolrSearchServiceImpl")) {
+      logger.info("SolrSearchServiceImpl add fault injector. method: {}", behavior.getName());
+    }
+    if (haveFaultInjector()) {
+      return;
+    }
+
     try {
       final String localVariableName = initializeLocalVariable(injectorId);
       int originalCodeOffset = insertBefore(-1, localVariableName);
@@ -468,6 +482,28 @@ public class JavassistMethod implements InstrumentMethod {
     } catch (Exception e) {
 
     }
+    faultInjected();
+  }
+
+  private boolean haveFaultInjector() {
+    try {
+      return behavior.getAnnotation(PinpointFaultInjected.class) != null;
+    } catch (Exception ignore) {
+
+    }
+    return false;
+  }
+
+  private void faultInjected() {
+    ConstPool cp = behavior.getDeclaringClass().getClassFile().getConstPool();
+    AnnotationsAttribute annotationsAttribute = (AnnotationsAttribute) behavior.getMethodInfo()
+        .getAttribute(AnnotationsAttribute.visibleTag);
+    if (annotationsAttribute == null) {
+      annotationsAttribute = new AnnotationsAttribute(cp, AnnotationsAttribute.visibleTag);
+    }
+    Annotation annotation = new Annotation(PinpointFaultInjected.class.getName(), cp);
+    annotationsAttribute.addAnnotation(annotation);
+    behavior.getMethodInfo().addAttribute(annotationsAttribute);
   }
 
   private boolean isAfterInterceptor(CaptureType captureType) {
@@ -614,7 +650,7 @@ public class JavassistMethod implements InstrumentMethod {
       System.getProperty("pinpoint.autoinstrument") == null || System
           .getProperty("pinpoint.autoinstrument").equals("true");
 
-  public void instrument() {
+  public synchronized void instrument() {
     syncCall();
   }
 
@@ -772,21 +808,21 @@ public class JavassistMethod implements InstrumentMethod {
       return newClassFile;
     }
 
-    private synchronized void retransformImplments(ClassRepository.ClassMirror target,
+    private void retransformImplments(ClassRepository.ClassMirror target,
         ClassRepository.Method method) {
       for (ClassRepository.ClassMirror impl : target.getImplClasses()) {
         doRetransform(impl, pluginContext
-            .getInstrumentClass(declaringClass.getClassLoader(), impl.getClassId().getName(),
-                impl.getClassFileBuffer()), method);
+                .getInstrumentClass(declaringClass.getClassLoader(), impl.getClassId().getName(), null),
+            method);
       }
     }
 
-    private synchronized void retransformSubClass(ClassRepository.ClassMirror target,
+    private void retransformSubClass(ClassRepository.ClassMirror target,
         ClassRepository.Method method) {
       for (ClassRepository.ClassMirror subClass : target.getSubClasses()) {
         doRetransform(subClass, pluginContext
             .getInstrumentClass(declaringClass.getClassLoader(), subClass.getClassId().getName(),
-                subClass.getClassFileBuffer()), method);
+                null), method);
       }
     }
 
