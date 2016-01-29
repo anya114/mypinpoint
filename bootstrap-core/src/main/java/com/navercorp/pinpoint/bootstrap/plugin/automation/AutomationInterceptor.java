@@ -10,28 +10,32 @@ import com.navercorp.pinpoint.common.trace.ServiceType;
 import com.navercorp.pinpoint.common.util.SystemClock;
 import lombok.Getter;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.function.Supplier;
 
 public class AutomationInterceptor implements AroundInterceptor {
   private final PLogger logger = PLoggerFactory.getLogger(this.getClass());
   private static final AutomationMethodDescriptor AUTOMATION_METHOD_DESCRIPTOR =
       new AutomationMethodDescriptor();
   private final boolean isDebug = logger.isDebugEnabled();
-  @Getter
-  private final TraceContext traceContext;
+  @Getter private final TraceContext traceContext;
   private final InstrumentMethod instrumentMethod;
-  private boolean called;
+  private AtomicBoolean called = new AtomicBoolean(false);
   @Getter private MethodDescriptor descriptor;
 
   private AtomicInteger count = new AtomicInteger(0);
   private LongAdder execSum = new LongAdder();
-  @Getter
-  private boolean on = true;
-  private long beforeTimeStamp;
-  private int maxCount = 3;
+  private AtomicBoolean on = new AtomicBoolean(true);
+  private ThreadLocal<Long> beforeTimeStamp = ThreadLocal.withInitial(new Supplier<Long>() {
+    @Override public Long get() {
+      return Long.valueOf(0);
+    }
+  });
+  private static final int maxCount = 500;
   //ms
-  private int minExecTime = 3;
+  private static final int minExecTime = 3;
 
   public AutomationInterceptor(TraceContext traceContext, MethodDescriptor methodDescriptor,
       InstrumentMethod instrumentMethod) {
@@ -41,16 +45,19 @@ public class AutomationInterceptor implements AroundInterceptor {
     traceContext.cacheApi(AUTOMATION_METHOD_DESCRIPTOR);
   }
 
+  public boolean isOn() {
+    return on.get();
+  }
+
   @Override public void before(Object target, Object[] args) {
 
     if (isDebug) {
       logger.beforeInterceptor(target, args);
     }
-    if (!called) {
-      called = true;
+    if (!called.get() && called.compareAndSet(false, true)) {
       instrumentMethod.instrument();
     }
-    if (!on) {
+    if (!on.get()) {
       return;
     }
 
@@ -70,8 +77,8 @@ public class AutomationInterceptor implements AroundInterceptor {
       recordRootSpan(recorder);
     }
     trace.traceBlockBegin();
-    if(count.get() < maxCount) {
-      beforeTimeStamp = System.currentTimeMillis();
+    if (count.get() < maxCount) {
+      beforeTimeStamp.set(System.currentTimeMillis());
     }
   }
 
@@ -86,17 +93,19 @@ public class AutomationInterceptor implements AroundInterceptor {
     if (isDebug) {
       logger.afterInterceptor(target, args);
     }
-    if (!on) {
+    if (!on.get()) {
       return;
     }
-    if(count.get() < maxCount) {
+    if (count.get() < maxCount) {
       long now = SystemClock.INSTANCE.getTime();
-      execSum.add(now - beforeTimeStamp);
-      logger.debug("AutomationInterceptor record time elapsed: {}", now - beforeTimeStamp);
-      beforeTimeStamp = now;
-      if(count.incrementAndGet() == maxCount) {
-        if(execSum.intValue() / maxCount < minExecTime) {
-          on = false;
+      execSum.add(now - beforeTimeStamp.get());
+      logger.debug("AutomationInterceptor record time elapsed: {}", now - beforeTimeStamp.get());
+      beforeTimeStamp.set(now);
+      if (count.incrementAndGet() == maxCount) {
+        if (execSum.intValue() / maxCount < minExecTime) {
+          on.compareAndSet(true, false);
+        } else {
+          logger.debug("AutomationInterceptor keep on. avrg time: {}", execSum.intValue() / maxCount);
         }
       }
     }

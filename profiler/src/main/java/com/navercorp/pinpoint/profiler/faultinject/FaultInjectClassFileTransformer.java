@@ -101,9 +101,6 @@ public class FaultInjectClassFileTransformer implements ClassFileTransformer {
     if (!faultMap.containsKey(classInternalName))
       return null;
     try {
-      if(jvmClassName.contains("SolrSearchServiceImpl")){
-        logger.info("fault inject transform {}", jvmClassName);
-      }
       InstrumentClass instrumentClass = instrumentClassPool
           .getClass(instrumentContext, loader, classInternalName, classfileBuffer);
       for (MethodFaultPair pair : faultMap.get(classInternalName)) {

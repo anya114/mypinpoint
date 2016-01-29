@@ -5,6 +5,7 @@ import com.navercorp.pinpoint.bootstrap.config.DefaultProfilerConfig;
 import com.navercorp.pinpoint.bootstrap.config.ProfilerConfig;
 import com.navercorp.pinpoint.bootstrap.instrument.*;
 import com.navercorp.pinpoint.bootstrap.instrument.transformer.TransformCallback;
+import com.navercorp.pinpoint.bootstrap.interceptor.Interceptor;
 import com.navercorp.pinpoint.bootstrap.interceptor.registry.InterceptorRegistry;
 import com.navercorp.pinpoint.bootstrap.logging.PLoggerFactory;
 import com.navercorp.pinpoint.bootstrap.plugin.automation.AutomationInterceptor;
@@ -19,17 +20,23 @@ import com.navercorp.pinpoint.test.TestClassLoader;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.asm.tree.analysis.Interpreter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.security.ProtectionDomain;
 import java.util.Properties;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 
 /**
@@ -60,10 +67,7 @@ public class AutomationInterceptorTest {
   @After public void after() throws Exception {
   }
 
-  /**
-   * Method: before(Object target, Object[] args)
-   */
-  @Test public void testBefore() throws Exception {
+  @Test public void testOn() throws Exception {
     final TestClassLoader loader = getTestClassLoader();
     final String javassistClassName = "com.navercorp.pinpoint.profiler.interceptor.bci.TestObject";
     loader.addTransformer(javassistClassName, new TransformCallback() {
@@ -98,13 +102,65 @@ public class AutomationInterceptorTest {
     Method callA = testObjectClazz.getMethod(methodName);
     AutomationInterceptor interceptor =
         (AutomationInterceptor) InterceptorRegistry.getInterceptor(0);
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 1025; i++) {
       callA.invoke(testObject);
     }
     assertNotNull(interceptor);
     assertEquals(false, interceptor.isOn());
-    System.out
-        .println(getStorage((DefaultTrace) interceptor.getTraceContext().currentTraceObject()));
+  }
+
+  @Test public void testConcurrent() throws Exception {
+    final TestClassLoader loader = getTestClassLoader();
+    final String javassistClassName = TestObject.class.getName();
+    final String methodName = "callA";
+    loader.addTransformer(javassistClassName, new TransformCallback() {
+
+      @Override public byte[] doInTransform(Instrumentor instrumentContext, ClassLoader classLoader,
+          String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
+          byte[] classfileBuffer) throws InstrumentException {
+        try {
+          logger.info("modify className:{} cl:{}", className, classLoader);
+
+          InstrumentClass aClass = instrumentContext
+              .getInstrumentClass(classLoader, javassistClassName, classfileBuffer);
+
+          aClass.getDeclaredMethod(methodName)
+              .addInterceptor(AutomationInterceptor.class.getName());
+
+          return aClass.toBytecode();
+        } catch (InstrumentException e) {
+        }
+        return null;
+      }
+    });
+
+    loader.initialize();
+
+    Class<?> testObjectClazz = loader.loadClass(javassistClassName);
+    final Object testObject = testObjectClazz.newInstance();
+    final Method callA = testObjectClazz.getMethod(methodName);
+    ExecutorService executorService = Executors.newFixedThreadPool(4);
+    for(int i = 0; i < 5000; i++) {
+      executorService.submit(new Runnable() {
+        @Override public void run() {
+          try {
+            callA.invoke(testObject);
+          } catch (IllegalAccessException e) {
+            e.printStackTrace();
+          } catch (InvocationTargetException e) {
+            e.printStackTrace();
+          }
+        }
+      });
+    }
+    try {
+      executorService.awaitTermination(10, TimeUnit.SECONDS);
+    }catch (InterruptedException e) {
+
+    }
+    AutomationInterceptor interceptor =
+        (AutomationInterceptor) InterceptorRegistry.getInterceptor(0);
+    assertFalse(interceptor.isOn());
   }
 
   private Storage getStorage(DefaultTrace trace) {
